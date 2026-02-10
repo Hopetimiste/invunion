@@ -83,9 +83,18 @@ AI:        NOT YET INTEGRATED ❌
 - [ ] Cloud Run: after first deploy, verify `api.invunion.com` maps to new service
 - [ ] Cloudflare Pages: set custom domain `app.invunion.com`
 
-#### 3.4 GitHub (Manual Steps)
-- [ ] Rename repo `project-br-union` → `invunion` (or create redirect)
-- [ ] Update GitHub Actions secrets if repo name changed
+#### 3.4 GitHub Monorepo ✅
+- [x] Created monorepo structure with `backend/` and `frontend/` directories
+- [x] Removed individual .git directories from subdirectories
+- [x] Created unified `.gitignore` at monorepo root
+- [x] Created comprehensive `README.md` for the monorepo
+- [x] Created GitHub Actions workflows:
+  - `.github/workflows/backend-deploy.yml` (triggers on `backend/` changes)
+  - `.github/workflows/frontend-deploy.yml` (triggers on `frontend/` changes)
+- [x] Removed old `backend/.github/` workflows
+- [x] Initial commit created and pushed to `main`
+- [x] Repository created: https://github.com/Hopetimiste/invunion
+- [ ] Configure GitHub Secrets (see `GITHUB-SECRETS-SETUP.md`)
 
 **Test**: Deploy backend + frontend, verify `api.invunion.com/api/v1/health` returns `"service":"invunion-api"`
 
