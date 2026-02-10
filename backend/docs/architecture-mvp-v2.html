@@ -1,0 +1,1350 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Architecture MVP v2 - Union API - Réconciliation Bancaire</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({ 
+            startOnLoad: true, 
+            theme: 'default',
+            flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true,
+                curve: 'basis'
+            }
+        });
+    </script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #e0e0e0;
+            line-height: 1.7;
+        }
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            padding: 40px 20px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 20px;
+            margin-bottom: 30px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        h1 {
+            font-size: 2.5em;
+            background: linear-gradient(90deg, #00d4ff, #7c3aed, #f472b6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #a0a0a0;
+            font-size: 1.2em;
+        }
+        .section {
+            background: rgba(255,255,255,0.05);
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 25px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        h2 {
+            color: #00d4ff;
+            font-size: 1.6em;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid rgba(0,212,255,0.3);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        h3 {
+            color: #7c3aed;
+            font-size: 1.3em;
+            margin: 25px 0 15px 0;
+        }
+        h4 {
+            color: #f472b6;
+            font-size: 1.1em;
+            margin: 20px 0 10px 0;
+        }
+        .mermaid {
+            background: #ffffff;
+            padding: 30px;
+            border-radius: 12px;
+            margin: 20px 0;
+            overflow-x: auto;
+        }
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 25px;
+        }
+        .card {
+            background: rgba(255,255,255,0.03);
+            border-radius: 12px;
+            padding: 25px;
+            border: 1px solid rgba(255,255,255,0.08);
+            transition: transform 0.3s ease, border-color 0.3s ease;
+        }
+        .card:hover {
+            transform: translateY(-3px);
+            border-color: rgba(0,212,255,0.3);
+        }
+        .card-api {
+            border-left: 4px solid #00d4ff;
+        }
+        .card-worker {
+            border-left: 4px solid #7c3aed;
+        }
+        .card-feature {
+            border-left: 4px solid #10b981;
+        }
+        .card-warning {
+            border-left: 4px solid #f59e0b;
+        }
+        .card-info {
+            border-left: 4px solid #3b82f6;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: 600;
+            margin-right: 8px;
+            margin-bottom: 8px;
+        }
+        .badge-blue { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+        .badge-green { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+        .badge-purple { background: rgba(124, 58, 237, 0.2); color: #a78bfa; }
+        .badge-orange { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+        .badge-pink { background: rgba(244, 114, 182, 0.2); color: #f472b6; }
+        .badge-cyan { background: rgba(0, 212, 255, 0.2); color: #00d4ff; }
+        
+        ul, ol {
+            margin: 15px 0;
+            padding-left: 25px;
+        }
+        li {
+            margin: 8px 0;
+            color: #c0c0c0;
+        }
+        li strong {
+            color: #e0e0e0;
+        }
+        
+        code {
+            background: rgba(124, 58, 237, 0.15);
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 0.9em;
+            color: #a78bfa;
+        }
+        pre {
+            background: #0d1117;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 15px 0;
+            border: 1px solid #30363d;
+        }
+        pre code {
+            background: none;
+            padding: 0;
+            color: #c9d1d9;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        th, td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        th {
+            background: rgba(124, 58, 237, 0.2);
+            color: #a78bfa;
+            font-weight: 600;
+        }
+        tr:hover {
+            background: rgba(255,255,255,0.03);
+        }
+        
+        .timeline {
+            position: relative;
+            padding-left: 30px;
+        }
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 8px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: linear-gradient(to bottom, #00d4ff, #7c3aed, #f472b6);
+        }
+        .timeline-item {
+            position: relative;
+            margin-bottom: 25px;
+            padding: 20px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -26px;
+            top: 25px;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #7c3aed;
+            border: 3px solid #1a1a2e;
+        }
+        .timeline-item h4 {
+            margin-top: 0;
+        }
+        
+        .estimate-box {
+            background: linear-gradient(135deg, rgba(124, 58, 237, 0.2), rgba(244, 114, 182, 0.1));
+            border: 1px solid rgba(124, 58, 237, 0.3);
+            border-radius: 16px;
+            padding: 30px;
+            text-align: center;
+            margin: 30px 0;
+        }
+        .estimate-number {
+            font-size: 4em;
+            font-weight: 700;
+            background: linear-gradient(90deg, #00d4ff, #7c3aed);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .estimate-label {
+            font-size: 1.3em;
+            color: #a0a0a0;
+        }
+        
+        .flow-box {
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+            padding: 20px;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.85em;
+            color: #a0a0a0;
+            white-space: pre-wrap;
+            margin: 15px 0;
+            border-left: 3px solid #7c3aed;
+        }
+        
+        .checklist {
+            list-style: none;
+            padding-left: 0;
+        }
+        .checklist li {
+            padding: 10px 0 10px 35px;
+            position: relative;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .checklist li::before {
+            content: "☐";
+            position: absolute;
+            left: 0;
+            font-size: 1.2em;
+            color: #7c3aed;
+        }
+        
+        .pros-cons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .pros { border-left: 4px solid #10b981; }
+        .cons { border-left: 4px solid #f59e0b; }
+        
+        @media (max-width: 900px) {
+            .grid-2 {
+                grid-template-columns: 1fr;
+            }
+            .pros-cons {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏗️ Architecture MVP v2</h1>
+            <p class="subtitle">Union API - Réconciliation Bancaire SaaS</p>
+            <p style="margin-top: 15px; color: #808080;">Janvier 2026 • API-First • Scalable • 2 Cloud Run</p>
+        </div>
+
+        <!-- DIAGRAMME PRINCIPAL -->
+        <div class="section">
+            <h2>📊 Diagramme d'Architecture MVP</h2>
+            <div class="mermaid">
+graph TB
+    %% Styles
+    classDef external fill:#ec4899,stroke:#be185d,stroke-width:2px,color:white;
+    classDef api fill:#0ea5e9,stroke:#0369a1,stroke-width:2px,color:white;
+    classDef worker fill:#8b5cf6,stroke:#6d28d9,stroke-width:2px,color:white;
+    classDef pubsub fill:#f59e0b,stroke:#d97706,stroke-width:2px,color:white;
+    classDef storage fill:#10b981,stroke:#059669,stroke-width:2px,color:white;
+    classDef secret fill:#ef4444,stroke:#dc2626,stroke-width:2px,color:white;
+    classDef ai fill:#06b6d4,stroke:#0891b2,stroke-width:2px,color:white;
+    classDef frontend fill:#64748b,stroke:#475569,stroke-width:2px,color:white;
+
+    %% SOURCES EXTERNES
+    subgraph Sources["🌍 Sources de Données"]
+        Tink["🏦 Tink API\n(Comptes Bancaires EU)"]:::external
+        Crypto["💎 Crypto Wallets\n(Etherscan, etc.)\n🔜 Intégrations futures"]:::external
+        Invoice["📄 Logiciels Facturation\n(Pennylane, Stripe...)\n🔜 1 par 1"]:::external
+        CSV["📁 Upload CSV/JSON\n(Transactions & Factures)"]:::external
+    end
+
+    %% FRONTEND
+    Frontend["💻 Frontend React\n(Vercel)"]:::frontend
+
+    %% CLOUD RUN #1 - CORE API
+    subgraph CR1["☁️ Cloud Run #1 - CORE API"]
+        direction TB
+        API["🚀 REST API\n\n━━━━━━━━━━━━━━━━━━\n📡 Endpoints CRUD\n🔐 Auth Firebase + API Keys\n📤 Upload CSV/JSON\n🔗 Webhooks Reception\n✋ Matching Manuel\n📊 Rapports & Alertes\n🔌 Gestion Connexions"]:::api
+    end
+
+    %% CLOUD RUN #2 - WORKER SERVICE
+    subgraph CR2["☁️ Cloud Run #2 - WORKER SERVICE"]
+        direction TB
+        Worker["⚙️ Background Jobs\n\n━━━━━━━━━━━━━━━━━━\n🔄 Ingestion & Normalisation\n🤖 Matching IA (Vertex AI)\n📈 Scoring Confiance\n🔔 Génération Alertes\n📋 Génération Rapports\n⏰ Scheduled Jobs"]:::worker
+    end
+
+    %% PUB/SUB + DLQ
+    subgraph PubSub["📨 Pub/Sub (Async)"]
+        TopicIngest[("📥 topic:\ningest")]:::pubsub
+        TopicMatching[("🤝 topic:\nmatching")]:::pubsub
+        TopicAlerts[("🔔 topic:\nalerts")]:::pubsub
+        
+        DLQ1[("💀 DLQ\ningest")]:::pubsub
+        DLQ2[("💀 DLQ\nmatching")]:::pubsub
+        DLQ3[("💀 DLQ\nalerts")]:::pubsub
+    end
+
+    %% STORAGE
+    subgraph Storage["💾 Stockage"]
+        CloudSQL[("🐘 Cloud SQL\nPostgreSQL\n\n• transactions\n• crypto_tx\n• invoices\n• matches\n• alerts\n• reports")]:::storage
+    end
+
+    %% SERVICES GCP
+    SecretManager["🔐 Secret Manager\n\n• Tink credentials\n• API Keys providers\n• User tokens"]:::secret
+    
+    VertexAI["🤖 Vertex AI\nGemini Pro\n\nMatching & Scoring"]:::ai
+
+    %% FLUX - Sources vers API
+    Tink -->|"Webhooks/Polling"| API
+    Crypto -.->|"API calls 🔜"| API
+    Invoice -->|"Webhooks/API"| API
+    CSV -->|"POST /api/ingest"| API
+    Frontend -->|"HTTPS"| API
+
+    %% FLUX - API vers Pub/Sub
+    API -->|"Publish"| TopicIngest
+    API -->|"Publish (manual)"| TopicMatching
+    API <-->|"Read/Write"| CloudSQL
+    API -.->|"Get secrets"| SecretManager
+
+    %% FLUX - Pub/Sub vers Worker
+    TopicIngest -->|"Subscribe"| Worker
+    TopicMatching -->|"Subscribe"| Worker
+    TopicAlerts -->|"Subscribe"| Worker
+
+    %% FLUX - DLQ
+    TopicIngest -.->|"5 failures"| DLQ1
+    TopicMatching -.->|"5 failures"| DLQ2
+    TopicAlerts -.->|"5 failures"| DLQ3
+
+    %% FLUX - Worker
+    Worker -->|"Normalize & Write"| CloudSQL
+    Worker -->|"Call AI"| VertexAI
+    Worker -.->|"Get secrets"| SecretManager
+    Worker -->|"Trigger alerts"| TopicAlerts
+    Worker -->|"Trigger matching"| TopicMatching
+
+    VertexAI -->|"Scores"| Worker
+            </div>
+        </div>
+
+        <!-- FEATURES MVP -->
+        <div class="section">
+            <h2>🎯 Fonctionnalités MVP</h2>
+            
+            <div class="grid-2">
+                <div class="card card-feature">
+                    <h3>🏦 1. Transactions Bancaires (Tink)</h3>
+                    <ul>
+                        <li><strong>OAuth2 avec Tink</strong> : L'utilisateur connecte ses comptes</li>
+                        <li><strong>Webhooks</strong> : Réception automatique des nouvelles transactions</li>
+                        <li><strong>Polling backup</strong> : Récupération périodique si webhooks manqués</li>
+                        <li><strong>Multi-comptes</strong> : Support plusieurs comptes par utilisateur</li>
+                    </ul>
+                    <span class="badge badge-green">MVP Ready</span>
+                </div>
+                
+                <div class="card card-feature">
+                    <h3>💎 2. Transactions Crypto</h3>
+                    <ul>
+                        <li><strong>Table flexible</strong> : <code>crypto_transactions</code> avec JSONB</li>
+                        <li><strong>Structure ouverte</strong> : Prête pour tout provider</li>
+                        <li><strong>Premières intégrations</strong> : Etherscan, Blockchair...</li>
+                        <li><strong>Upload manuel</strong> : CSV de wallets en attendant</li>
+                    </ul>
+                    <span class="badge badge-orange">Champ Ouvert</span>
+                </div>
+                
+                <div class="card card-feature">
+                    <h3>📄 3. Logiciels de Facturation</h3>
+                    <ul>
+                        <li><strong>Données structurées</strong> : Pas d'OCR, API uniquement</li>
+                        <li><strong>Intégration progressive</strong> : 1 provider pour MVP</li>
+                        <li><strong>Candidats MVP</strong> : Pennylane, Stripe Invoicing, QuickBooks</li>
+                        <li><strong>Webhooks prioritaires</strong> : Sync automatique</li>
+                    </ul>
+                    <span class="badge badge-green">MVP Ready</span>
+                </div>
+                
+                <div class="card card-feature">
+                    <h3>🤖 4. Matching IA + Manuel</h3>
+                    <ul>
+                        <li><strong>Vertex AI (Gemini)</strong> : Matching automatique intelligent</li>
+                        <li><strong>Scoring 0-100%</strong> : Confiance du matching</li>
+                        <li><strong>Seuils configurables</strong> : Auto-match > 85%, review 50-85%</li>
+                        <li><strong>Override manuel</strong> : L'utilisateur peut corriger/créer</li>
+                    </ul>
+                    <span class="badge badge-purple">IA Powered</span>
+                </div>
+                
+                <div class="card card-feature">
+                    <h3>🔔 5. Alertes & Rapports</h3>
+                    <ul>
+                        <li><strong>Alertes configurables</strong> : Nouveau match, anomalie, seuil</li>
+                        <li><strong>Rapports dashboard</strong> : Stats réconciliation</li>
+                        <li><strong>Export</strong> : CSV/JSON des rapports</li>
+                        <li><strong>Notifications</strong> : Email (puis push pour v2)</li>
+                    </ul>
+                    <span class="badge badge-green">MVP Ready</span>
+                </div>
+                
+                <div class="card card-feature">
+                    <h3>📤 6. Upload CSV</h3>
+                    <ul>
+                        <li><strong>Transactions</strong> : Import historique bancaire</li>
+                        <li><strong>Factures</strong> : Import depuis comptabilité</li>
+                        <li><strong>Templates</strong> : Formats standard fournis</li>
+                        <li><strong>Validation</strong> : Erreurs claires, preview avant import</li>
+                    </ul>
+                    <span class="badge badge-green">MVP Ready</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CLOUD RUN DETAILS -->
+        <div class="section">
+            <h2>☁️ Répartition des 2 Cloud Run</h2>
+            
+            <div class="grid-2">
+                <div class="card card-api">
+                    <h3>🚀 Cloud Run #1 : CORE API</h3>
+                    <p style="color: #00d4ff; font-weight: 600; margin-bottom: 15px;">Point d'entrée unique • Synchrone • API-First</p>
+                    
+                    <h4>Responsabilités</h4>
+                    <ul>
+                        <li>✅ <strong>Authentication</strong> : Firebase Auth (frontend) + API Keys (externe)</li>
+                        <li>✅ <strong>REST Endpoints</strong> : CRUD transactions, factures, matches</li>
+                        <li>✅ <strong>Webhooks</strong> : Réception Tink, facturation</li>
+                        <li>✅ <strong>Upload</strong> : CSV/JSON parsing et validation</li>
+                        <li>✅ <strong>Matching Manuel</strong> : Création/modification par utilisateur</li>
+                        <li>✅ <strong>Lecture</strong> : Alertes, rapports, dashboard data</li>
+                        <li>✅ <strong>Connexions</strong> : Gestion providers (Tink OAuth flow)</li>
+                    </ul>
+                    
+                    <h4>Configuration</h4>
+                    <table>
+                        <tr><td>Min instances</td><td><code>0</code> (scale to zero)</td></tr>
+                        <tr><td>Max instances</td><td><code>10</code></td></tr>
+                        <tr><td>Concurrency</td><td><code>80</code> req/instance</td></tr>
+                        <tr><td>CPU</td><td><code>1 vCPU</code></td></tr>
+                        <tr><td>Memory</td><td><code>512 MiB</code></td></tr>
+                        <tr><td>Timeout</td><td><code>60s</code></td></tr>
+                    </table>
+                    
+                    <h4>Endpoints Principaux</h4>
+                    <pre><code># Transactions
+GET/POST   /api/v1/transactions
+GET/PUT    /api/v1/transactions/:id
+
+# Factures
+GET/POST   /api/v1/invoices
+GET/PUT    /api/v1/invoices/:id
+
+# Matches
+GET/POST   /api/v1/matches
+POST       /api/v1/matches/manual
+PUT/DELETE /api/v1/matches/:id
+
+# Alertes & Rapports
+GET        /api/v1/alerts
+GET        /api/v1/reports
+GET        /api/v1/reports/export
+
+# Ingestion
+POST       /api/v1/ingest/upload
+POST       /api/v1/ingest/webhook/tink
+POST       /api/v1/ingest/webhook/:provider
+
+# Connexions
+POST       /api/v1/connections/tink/init
+GET        /api/v1/connections/tink/callback
+POST       /api/v1/connections/invoice/:provider</code></pre>
+                </div>
+                
+                <div class="card card-worker">
+                    <h3>⚙️ Cloud Run #2 : WORKER SERVICE</h3>
+                    <p style="color: #7c3aed; font-weight: 600; margin-bottom: 15px;">Traitement asynchrone • Background Jobs • IA</p>
+                    
+                    <h4>Responsabilités</h4>
+                    <ul>
+                        <li>✅ <strong>Ingestion</strong> : Normalisation toutes sources → format unifié</li>
+                        <li>✅ <strong>Matching IA</strong> : Appel Vertex AI, calcul scores</li>
+                        <li>✅ <strong>Alertes</strong> : Génération et dispatch notifications</li>
+                        <li>✅ <strong>Rapports</strong> : Calcul stats, agrégations</li>
+                        <li>✅ <strong>Scheduled Jobs</strong> : Polling Tink, cleanup</li>
+                        <li>✅ <strong>DLQ Processing</strong> : Retry et alertes sur échecs</li>
+                    </ul>
+                    
+                    <h4>Configuration</h4>
+                    <table>
+                        <tr><td>Min instances</td><td><code>0</code> (scale to zero)</td></tr>
+                        <tr><td>Max instances</td><td><code>5</code></td></tr>
+                        <tr><td>Concurrency</td><td><code>10</code> jobs/instance</td></tr>
+                        <tr><td>CPU</td><td><code>2 vCPU</code> (pour IA)</td></tr>
+                        <tr><td>Memory</td><td><code>1 GiB</code></td></tr>
+                        <tr><td>Timeout</td><td><code>900s</code> (15 min)</td></tr>
+                    </table>
+                    
+                    <h4>Subscriptions Pub/Sub</h4>
+                    <pre><code># Subscription: ingest-sub
+Reçoit: Données brutes (Tink, CSV, invoices)
+Action: 
+  → Parse & Normalise
+  → Écrit Cloud SQL
+  → Publie dans topic:matching
+
+# Subscription: matching-sub
+Reçoit: Transactions/factures à matcher
+Action:
+  → Lit candidats depuis Cloud SQL
+  → Appelle Vertex AI
+  → Écrit matches avec scores
+  → Publie dans topic:alerts si match
+
+# Subscription: alerts-sub
+Reçoit: Événements déclencheurs
+Action:
+  → Génère alerte
+  → Envoie notification (email)
+  → Log dans Cloud SQL</code></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- PUB/SUB + DLQ -->
+        <div class="section">
+            <h2>📨 Pub/Sub + Dead Letter Queues</h2>
+            
+            <div class="card card-warning">
+                <h3>⚠️ Pourquoi Pub/Sub + DLQ est essentiel</h3>
+                <ul>
+                    <li><strong>Découplage</strong> : Core API répond vite, traitement en background</li>
+                    <li><strong>Résilience</strong> : Si Worker tombe, messages conservés</li>
+                    <li><strong>Scalabilité</strong> : Worker scale automatiquement selon la queue</li>
+                    <li><strong>Retry</strong> : 5 tentatives avant DLQ, pas de perte de données</li>
+                    <li><strong>Debug</strong> : DLQ permet d'analyser et rejouer les échecs</li>
+                </ul>
+            </div>
+            
+            <h3>Configuration Pub/Sub</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Topic</th>
+                        <th>Subscription</th>
+                        <th>Ack Deadline</th>
+                        <th>Max Attempts</th>
+                        <th>DLQ</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>ingest</code></td>
+                        <td><code>ingest-sub</code></td>
+                        <td>120s</td>
+                        <td>5</td>
+                        <td><code>ingest-dlq</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>matching</code></td>
+                        <td><code>matching-sub</code></td>
+                        <td>600s (10min)</td>
+                        <td>5</td>
+                        <td><code>matching-dlq</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>alerts</code></td>
+                        <td><code>alerts-sub</code></td>
+                        <td>60s</td>
+                        <td>5</td>
+                        <td><code>alerts-dlq</code></td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <h3>Commandes de Setup</h3>
+            <pre><code># Créer topics
+gcloud pubsub topics create ingest matching alerts
+gcloud pubsub topics create ingest-dlq matching-dlq alerts-dlq
+
+# Créer subscriptions avec DLQ
+gcloud pubsub subscriptions create ingest-sub \
+    --topic=ingest \
+    --push-endpoint=https://worker-service-xxx.run.app/pubsub/ingest \
+    --ack-deadline=120 \
+    --dead-letter-topic=ingest-dlq \
+    --max-delivery-attempts=5
+
+gcloud pubsub subscriptions create matching-sub \
+    --topic=matching \
+    --push-endpoint=https://worker-service-xxx.run.app/pubsub/matching \
+    --ack-deadline=600 \
+    --dead-letter-topic=matching-dlq \
+    --max-delivery-attempts=5
+
+gcloud pubsub subscriptions create alerts-sub \
+    --topic=alerts \
+    --push-endpoint=https://worker-service-xxx.run.app/pubsub/alerts \
+    --ack-deadline=60 \
+    --dead-letter-topic=alerts-dlq \
+    --max-delivery-attempts=5</code></pre>
+        </div>
+
+        <!-- SECRET MANAGER -->
+        <div class="section">
+            <h2>🔐 Secret Manager</h2>
+            
+            <div class="card card-info">
+                <h3>Secrets à stocker</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Secret</th>
+                            <th>Description</th>
+                            <th>Accès</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>tink-client-id</code></td>
+                            <td>Tink OAuth Client ID</td>
+                            <td>Core API</td>
+                        </tr>
+                        <tr>
+                            <td><code>tink-client-secret</code></td>
+                            <td>Tink OAuth Client Secret</td>
+                            <td>Core API</td>
+                        </tr>
+                        <tr>
+                            <td><code>db-password</code></td>
+                            <td>Cloud SQL PostgreSQL password</td>
+                            <td>Core API, Worker</td>
+                        </tr>
+                        <tr>
+                            <td><code>firebase-admin-key</code></td>
+                            <td>Firebase Admin SDK credentials</td>
+                            <td>Core API</td>
+                        </tr>
+                        <tr>
+                            <td><code>invoicing-{provider}-key</code></td>
+                            <td>API keys facturation (par provider)</td>
+                            <td>Core API, Worker</td>
+                        </tr>
+                        <tr>
+                            <td><code>crypto-{provider}-key</code></td>
+                            <td>API keys crypto (futur)</td>
+                            <td>Core API, Worker</td>
+                        </tr>
+                        <tr>
+                            <td><code>sendgrid-api-key</code></td>
+                            <td>Pour emails alertes</td>
+                            <td>Worker</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <h3>Accès depuis Cloud Run</h3>
+            <pre><code>// Node.js - Accès Secret Manager
+import { SecretManagerServiceClient } from '@google-cloud/secret-manager';
+
+const client = new SecretManagerServiceClient();
+
+async function getSecret(secretName) {
+    const [version] = await client.accessSecretVersion({
+        name: `projects/${PROJECT_ID}/secrets/${secretName}/versions/latest`,
+    });
+    return version.payload.data.toString();
+}
+
+// Usage
+const tinkClientId = await getSecret('tink-client-id');
+const tinkClientSecret = await getSecret('tink-client-secret');</code></pre>
+        </div>
+
+        <!-- DATA MODEL -->
+        <div class="section">
+            <h2>🗃️ Modèle de Données Cloud SQL</h2>
+            
+            <h3>Tables Principales</h3>
+            <pre><code>-- TENANTS & USERS
+CREATE TABLE tenants (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    plan VARCHAR(50) DEFAULT 'starter', -- starter, pro, business
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID REFERENCES tenants(id),
+    firebase_uid VARCHAR(255) UNIQUE NOT NULL,
+    email VARCHAR(255) NOT NULL,
+    role VARCHAR(50) DEFAULT 'user', -- admin, user
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- BANK CONNECTIONS (Tink)
+CREATE TABLE bank_connections (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID REFERENCES tenants(id),
+    user_id UUID REFERENCES users(id),
+    provider VARCHAR(50) NOT NULL DEFAULT 'tink',
+    provider_connection_id VARCHAR(255),
+    status VARCHAR(50) DEFAULT 'pending', -- pending, active, expired, error
+    credentials_ref VARCHAR(255), -- Reference dans Secret Manager si besoin
+    last_sync_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE bank_accounts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    connection_id UUID REFERENCES bank_connections(id),
+    tenant_id UUID REFERENCES tenants(id),
+    provider_account_id VARCHAR(255),
+    name VARCHAR(255),
+    iban VARCHAR(50),
+    currency VARCHAR(3) DEFAULT 'EUR',
+    account_type VARCHAR(50),
+    balance DECIMAL(15,2),
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- TRANSACTIONS (Unified)
+CREATE TABLE transactions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID REFERENCES tenants(id),
+    account_id UUID REFERENCES bank_accounts(id),
+    source_type VARCHAR(50) NOT NULL, -- 'tink', 'csv', 'api'
+    source_id VARCHAR(255) NOT NULL,
+    source_raw JSONB, -- Données brutes du provider
+    amount DECIMAL(15,2) NOT NULL,
+    currency VARCHAR(3) DEFAULT 'EUR',
+    transaction_date DATE NOT NULL,
+    booking_date DATE,
+    description TEXT,
+    category VARCHAR(100),
+    counterparty_name VARCHAR(255),
+    counterparty_iban VARCHAR(50),
+    status VARCHAR(50) DEFAULT 'unmatched', -- unmatched, matched, ignored
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(source_type, source_id)
+);
+
+-- CRYPTO TRANSACTIONS (Flexible)
+CREATE TABLE crypto_transactions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID REFERENCES tenants(id),
+    wallet_address VARCHAR(255),
+    chain VARCHAR(50), -- 'ethereum', 'bitcoin', 'polygon'
+    provider VARCHAR(50), -- 'etherscan', 'manual', etc.
+    tx_hash VARCHAR(255) UNIQUE,
+    amount DECIMAL(30,18), -- Crypto precision
+    token_symbol VARCHAR(20),
+    token_address VARCHAR(255),
+    from_address VARCHAR(255),
+    to_address VARCHAR(255),
+    transaction_date TIMESTAMP,
+    gas_used DECIMAL(30,0),
+    gas_price DECIMAL(30,0),
+    status VARCHAR(50) DEFAULT 'unmatched',
+    raw_data JSONB, -- Flexible pour tout provider
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- INVOICE PROVIDERS
+CREATE TABLE invoice_providers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID REFERENCES tenants(id),
+    provider VARCHAR(50) NOT NULL, -- 'pennylane', 'stripe', 'quickbooks'
+    api_key_ref VARCHAR(255), -- Secret Manager reference
+    webhook_secret_ref VARCHAR(255),
+    status VARCHAR(50) DEFAULT 'active',
+    last_sync_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- INVOICES
+CREATE TABLE invoices (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID REFERENCES tenants(id),
+    provider_id UUID REFERENCES invoice_providers(id),
+    source_type VARCHAR(50) NOT NULL, -- provider name ou 'csv'
+    source_id VARCHAR(255) NOT NULL,
+    source_raw JSONB,
+    invoice_number VARCHAR(100),
+    invoice_date DATE,
+    due_date DATE,
+    amount DECIMAL(15,2) NOT NULL,
+    currency VARCHAR(3) DEFAULT 'EUR',
+    vat_amount DECIMAL(15,2),
+    customer_name VARCHAR(255),
+    customer_email VARCHAR(255),
+    description TEXT,
+    status VARCHAR(50) DEFAULT 'unpaid', -- unpaid, paid, matched, cancelled
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(source_type, source_id)
+);
+
+-- MATCHES
+CREATE TABLE matches (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID REFERENCES tenants(id),
+    transaction_id UUID REFERENCES transactions(id),
+    transaction_type VARCHAR(50) DEFAULT 'bank', -- 'bank', 'crypto'
+    crypto_transaction_id UUID REFERENCES crypto_transactions(id),
+    invoice_id UUID REFERENCES invoices(id),
+    match_type VARCHAR(50) NOT NULL, -- 'ai_auto', 'manual', 'rule'
+    confidence_score DECIMAL(5,2), -- 0.00 à 100.00
+    ai_reasoning TEXT, -- Explication IA
+    matched_by UUID REFERENCES users(id), -- NULL si auto
+    status VARCHAR(50) DEFAULT 'active', -- active, cancelled
+    created_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(transaction_id, invoice_id)
+);
+
+-- ALERTS
+CREATE TABLE alerts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID REFERENCES tenants(id),
+    user_id UUID REFERENCES users(id),
+    alert_type VARCHAR(50) NOT NULL, -- 'new_match', 'low_confidence', 'anomaly'
+    title VARCHAR(255),
+    message TEXT,
+    related_match_id UUID REFERENCES matches(id),
+    status VARCHAR(50) DEFAULT 'unread', -- unread, read, dismissed
+    notification_sent BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- REPORTS (Cache)
+CREATE TABLE reports (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID REFERENCES tenants(id),
+    report_type VARCHAR(50) NOT NULL, -- 'reconciliation', 'monthly', 'custom'
+    period_start DATE,
+    period_end DATE,
+    data JSONB NOT NULL,
+    generated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- IMPORT JOBS
+CREATE TABLE import_jobs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID REFERENCES tenants(id),
+    user_id UUID REFERENCES users(id),
+    file_name VARCHAR(255),
+    file_type VARCHAR(50), -- 'transactions', 'invoices'
+    file_format VARCHAR(20), -- 'csv', 'json'
+    total_rows INTEGER,
+    processed_rows INTEGER DEFAULT 0,
+    error_rows INTEGER DEFAULT 0,
+    errors JSONB, -- Détails erreurs par ligne
+    status VARCHAR(50) DEFAULT 'pending', -- pending, processing, completed, failed
+    started_at TIMESTAMP,
+    completed_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- AUDIT LOG
+CREATE TABLE audit_log (
+    id BIGSERIAL PRIMARY KEY,
+    tenant_id UUID,
+    user_id UUID,
+    action VARCHAR(50) NOT NULL,
+    resource_type VARCHAR(50),
+    resource_id UUID,
+    old_values JSONB,
+    new_values JSONB,
+    ip_address INET,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- INDEXES
+CREATE INDEX idx_transactions_tenant ON transactions(tenant_id);
+CREATE INDEX idx_transactions_status ON transactions(tenant_id, status);
+CREATE INDEX idx_transactions_date ON transactions(tenant_id, transaction_date);
+CREATE INDEX idx_invoices_tenant ON invoices(tenant_id);
+CREATE INDEX idx_invoices_status ON invoices(tenant_id, status);
+CREATE INDEX idx_matches_tenant ON matches(tenant_id);
+CREATE INDEX idx_alerts_tenant_status ON alerts(tenant_id, status);
+CREATE INDEX idx_audit_tenant_date ON audit_log(tenant_id, created_at DESC);</code></pre>
+        </div>
+
+        <!-- FLUX DÉTAILLÉS -->
+        <div class="section">
+            <h2>🔄 Flux de Données Détaillés</h2>
+            
+            <div class="grid-2">
+                <div class="card">
+                    <h4>1️⃣ Flux Tink (Transactions Bancaires)</h4>
+                    <div class="flow-box">User → Frontend: "Connecter ma banque"
+    ↓
+Frontend → Core API: POST /api/v1/connections/tink/init
+    ↓
+Core API → Tink: Initier OAuth flow
+    ↓
+User → Tink: Authentification bancaire
+    ↓
+Tink → Core API: Callback avec auth code
+    ↓
+Core API → Cloud SQL: Créer bank_connection
+    ↓
+Tink → Core API: Webhook "new_transactions"
+    ↓
+Core API → Pub/Sub: Publish to 'ingest'
+    ↓
+Worker ← Pub/Sub: Subscribe 'ingest'
+    ↓
+Worker → Cloud SQL: INSERT transactions
+    ↓
+Worker → Pub/Sub: Publish to 'matching'</div>
+                </div>
+                
+                <div class="card">
+                    <h4>2️⃣ Flux CSV Upload</h4>
+                    <div class="flow-box">User → Frontend: Upload fichier CSV
+    ↓
+Frontend → Core API: POST /api/v1/ingest/upload
+    ↓
+Core API: Valide format CSV
+    ↓
+Core API → Cloud SQL: Créer import_job (pending)
+    ↓
+Core API → Pub/Sub: Publish to 'ingest'
+    ↓
+Core API → Frontend: 202 Accepted + job_id
+    ↓
+Worker ← Pub/Sub: Subscribe 'ingest'
+    ↓
+Worker: Parse chaque ligne
+    ↓
+Worker → Cloud SQL: INSERT transactions (bulk)
+    ↓
+Worker → Cloud SQL: UPDATE import_job (completed)
+    ↓
+Worker → Pub/Sub: Publish to 'matching'</div>
+                </div>
+                
+                <div class="card">
+                    <h4>3️⃣ Flux Matching IA</h4>
+                    <div class="flow-box">Worker ← Pub/Sub: Subscribe 'matching'
+    ↓
+Worker → Cloud SQL: SELECT unmatched transactions
+Worker → Cloud SQL: SELECT unmatched invoices
+    ↓
+Pour chaque paire potentielle:
+    ↓
+Worker → Vertex AI: Prompt matching
+  {
+    "transaction": {...},
+    "invoice": {...},
+    "question": "Ces éléments correspondent-ils?"
+  }
+    ↓
+Vertex AI → Worker: 
+  {
+    "match": true,
+    "confidence": 0.92,
+    "reasoning": "Montants identiques, dates proches..."
+  }
+    ↓
+Si confidence > 0.85:
+  Worker → Cloud SQL: INSERT match (ai_auto)
+  Worker → Cloud SQL: UPDATE transaction (matched)
+  Worker → Cloud SQL: UPDATE invoice (matched)
+  Worker → Pub/Sub: Publish to 'alerts'
+    ↓
+Si confidence 0.50-0.85:
+  Worker → Cloud SQL: INSERT match (status: pending_review)
+  Worker → Pub/Sub: Publish to 'alerts' (review needed)</div>
+                </div>
+                
+                <div class="card">
+                    <h4>4️⃣ Flux Matching Manuel</h4>
+                    <div class="flow-box">User → Frontend: Sélectionne transaction + facture
+    ↓
+Frontend → Core API: POST /api/v1/matches/manual
+  {
+    "transaction_id": "...",
+    "invoice_id": "..."
+  }
+    ↓
+Core API: Valide existence des éléments
+    ↓
+Core API → Cloud SQL: INSERT match (manual)
+    ↓
+Core API → Cloud SQL: UPDATE transaction (matched)
+Core API → Cloud SQL: UPDATE invoice (matched)
+    ↓
+Core API → Pub/Sub: Publish to 'alerts'
+    ↓
+Core API → Frontend: 201 Created</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ESTIMATION TEMPS -->
+        <div class="section">
+            <h2>⏱️ Estimation de Temps MVP</h2>
+            
+            <div class="estimate-box">
+                <div class="estimate-number">10-12</div>
+                <div class="estimate-label">semaines pour 1 développeur full-stack</div>
+            </div>
+            
+            <div class="card card-warning">
+                <h3>⚠️ Hypothèses</h3>
+                <ul>
+                    <li>Développeur expérimenté GCP (Cloud Run, Pub/Sub, Cloud SQL)</li>
+                    <li>Expérience Node.js/TypeScript + React</li>
+                    <li>Travail à temps plein (~40h/semaine)</li>
+                    <li>Pas de blocages majeurs sur les APIs externes (Tink, facturation)</li>
+                </ul>
+            </div>
+            
+            <h3>Planning Détaillé</h3>
+            <div class="timeline">
+                <div class="timeline-item">
+                    <h4>📅 Semaines 1-2 : Infrastructure & Base</h4>
+                    <ul>
+                        <li>Setup GCP (Cloud Run, Pub/Sub, Cloud SQL, Secret Manager)</li>
+                        <li>Structure projet backend (Core API skeleton)</li>
+                        <li>Auth Firebase + middleware</li>
+                        <li>CI/CD basique (Cloud Build)</li>
+                        <li>Frontend: Layout dashboard, pages principales</li>
+                    </ul>
+                    <span class="badge badge-cyan">Fondations</span>
+                </div>
+                
+                <div class="timeline-item">
+                    <h4>📅 Semaines 3-4 : Tink Integration</h4>
+                    <ul>
+                        <li>OAuth flow Tink complet</li>
+                        <li>Webhooks Tink → Core API → Pub/Sub</li>
+                        <li>Worker: Ingestion et normalisation Tink</li>
+                        <li>Frontend: Connexion bancaire, liste transactions</li>
+                        <li>Tests end-to-end flux Tink</li>
+                    </ul>
+                    <span class="badge badge-green">Core Feature</span>
+                </div>
+                
+                <div class="timeline-item">
+                    <h4>📅 Semaines 5-6 : Factures + CSV</h4>
+                    <ul>
+                        <li>Intégration 1 provider facturation (Pennylane ou Stripe)</li>
+                        <li>Upload CSV transactions + factures</li>
+                        <li>Validation, preview, import jobs</li>
+                        <li>Frontend: Upload UI, liste factures</li>
+                    </ul>
+                    <span class="badge badge-green">Core Feature</span>
+                </div>
+                
+                <div class="timeline-item">
+                    <h4>📅 Semaines 7-8 : Matching IA</h4>
+                    <ul>
+                        <li>Intégration Vertex AI (Gemini)</li>
+                        <li>Prompt engineering pour matching</li>
+                        <li>Scoring et seuils configurables</li>
+                        <li>Worker: Pipeline matching complet</li>
+                        <li>Frontend: Vue matches, statuts, review</li>
+                    </ul>
+                    <span class="badge badge-purple">IA Feature</span>
+                </div>
+                
+                <div class="timeline-item">
+                    <h4>📅 Semaine 9 : Matching Manuel + Corrections</h4>
+                    <ul>
+                        <li>API matching manuel</li>
+                        <li>Override IA par utilisateur</li>
+                        <li>Frontend: Interface de matching drag & drop</li>
+                        <li>Historique des corrections</li>
+                    </ul>
+                    <span class="badge badge-blue">User Feature</span>
+                </div>
+                
+                <div class="timeline-item">
+                    <h4>📅 Semaine 10 : Alertes & Rapports</h4>
+                    <ul>
+                        <li>Système d'alertes configurables</li>
+                        <li>Notifications email (SendGrid)</li>
+                        <li>Dashboard stats réconciliation</li>
+                        <li>Export rapports CSV/JSON</li>
+                    </ul>
+                    <span class="badge badge-orange">Reporting</span>
+                </div>
+                
+                <div class="timeline-item">
+                    <h4>📅 Semaines 11-12 : Polish & Go Live</h4>
+                    <ul>
+                        <li>Tests de charge et optimisation</li>
+                        <li>Documentation API (OpenAPI)</li>
+                        <li>Onboarding flow utilisateur</li>
+                        <li>Bug fixes et polish UI</li>
+                        <li>Préparation structure crypto (tables prêtes)</li>
+                        <li>Monitoring et alertes GCP</li>
+                    </ul>
+                    <span class="badge badge-pink">Go Live</span>
+                </div>
+            </div>
+            
+            <div class="grid-2" style="margin-top: 30px;">
+                <div class="card pros">
+                    <h4>✅ Ce qui accélère</h4>
+                    <ul>
+                        <li>Tink a une bonne documentation</li>
+                        <li>Cloud Run très rapide à déployer</li>
+                        <li>Vertex AI (Gemini) facile d'accès</li>
+                        <li>React + shadcn/ui pour frontend rapide</li>
+                        <li>Pub/Sub gère la complexité async</li>
+                    </ul>
+                </div>
+                <div class="card cons">
+                    <h4>⚠️ Ce qui peut ralentir</h4>
+                    <ul>
+                        <li>Approval Tink (certification DSP2)</li>
+                        <li>Intégration facturation variable selon provider</li>
+                        <li>Tuning du matching IA (prompt engineering)</li>
+                        <li>Edge cases multi-devises</li>
+                        <li>Tests avec vraies données bancaires</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- MON AVIS -->
+        <div class="section">
+            <h2>💡 Mon Avis sur l'Architecture</h2>
+            
+            <div class="card card-feature">
+                <h3>✅ Oui, c'est pertinent !</h3>
+                <p>Cette architecture est solide pour un MVP SaaS B2B. Voici pourquoi :</p>
+                <ul>
+                    <li><strong>2 Cloud Run = bon équilibre</strong> : Séparation claire sync/async sans sur-engineering</li>
+                    <li><strong>Pub/Sub + DLQ = résilience</strong> : Indispensable pour du financier (pas de perte de données)</li>
+                    <li><strong>Secret Manager = sécurité</strong> : Conformité RGPD/DSP2 facilitée</li>
+                    <li><strong>Scale to Zero</strong> : Coûts minimaux au début (~50-100€/mois pour commencer)</li>
+                    <li><strong>API-First</strong> : Permet clients externes dès le MVP, différenciateur B2B</li>
+                </ul>
+            </div>
+            
+            <div class="card card-info">
+                <h3>💡 Suggestions d'Optimisation</h3>
+                <ul>
+                    <li><strong>Cache Redis (optionnel MVP)</strong> : Ajouter plus tard si latence API devient un problème</li>
+                    <li><strong>Rate Limiting</strong> : Implémenter dès le MVP (simple avec Redis ou Cloud Armor)</li>
+                    <li><strong>Idempotency</strong> : Table <code>webhook_events</code> pour éviter doublons Tink</li>
+                    <li><strong>Monitoring</strong> : Cloud Logging + quelques métriques custom dès le début</li>
+                </ul>
+            </div>
+            
+            <div class="card card-warning">
+                <h3>⚠️ Points d'Attention</h3>
+                <ul>
+                    <li><strong>Certification Tink</strong> : Anticiper le process (peut prendre quelques semaines)</li>
+                    <li><strong>Provider facturation</strong> : Choisir celui avec meilleure API/docs (Pennylane conseillé pour France)</li>
+                    <li><strong>RGPD</strong> : Prévoir suppression données, export, audit trail dès le début</li>
+                    <li><strong>Tests Sandbox</strong> : Tink a un mode sandbox, l'utiliser massivement</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- COÛTS MVP -->
+        <div class="section">
+            <h2>💰 Estimation Coûts MVP (Mensuel)</h2>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>Service</th>
+                        <th>Configuration MVP</th>
+                        <th>Coût estimé</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Cloud SQL (PostgreSQL)</td>
+                        <td>db-f1-micro, 10GB SSD</td>
+                        <td>~15€/mois</td>
+                    </tr>
+                    <tr>
+                        <td>Cloud Run (Core API)</td>
+                        <td>1 vCPU, 512MB, auto-scale</td>
+                        <td>~20€/mois</td>
+                    </tr>
+                    <tr>
+                        <td>Cloud Run (Worker)</td>
+                        <td>2 vCPU, 1GB, auto-scale</td>
+                        <td>~25€/mois</td>
+                    </tr>
+                    <tr>
+                        <td>Pub/Sub</td>
+                        <td>~100k messages/mois</td>
+                        <td>~5€/mois</td>
+                    </tr>
+                    <tr>
+                        <td>Secret Manager</td>
+                        <td>10-20 secrets</td>
+                        <td>~1€/mois</td>
+                    </tr>
+                    <tr>
+                        <td>Vertex AI (Gemini)</td>
+                        <td>~50k matchings/mois</td>
+                        <td>~30€/mois</td>
+                    </tr>
+                    <tr>
+                        <td>Cloud Logging/Monitoring</td>
+                        <td>Basic</td>
+                        <td>~5€/mois</td>
+                    </tr>
+                    <tr>
+                        <td>Vercel (Frontend)</td>
+                        <td>Pro plan</td>
+                        <td>~20€/mois</td>
+                    </tr>
+                    <tr>
+                        <td><strong>TOTAL</strong></td>
+                        <td></td>
+                        <td><strong>~120€/mois</strong></td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <div class="card card-info">
+                <p>💡 <strong>Note</strong> : Ces coûts sont pour un MVP avec ~10-50 utilisateurs actifs. Le scale to zero de Cloud Run garde les coûts bas au démarrage. Avec 100+ utilisateurs, prévoir ~250-300€/mois.</p>
+            </div>
+        </div>
+
+        <!-- CHECKLIST FINALE -->
+        <div class="section">
+            <h2>✅ Checklist Go Live MVP</h2>
+            
+            <div class="grid-2">
+                <div class="card">
+                    <h4>🔧 Infrastructure</h4>
+                    <ul class="checklist">
+                        <li>Créer projet GCP production</li>
+                        <li>Setup Cloud SQL + backup</li>
+                        <li>Créer topics Pub/Sub + DLQ</li>
+                        <li>Configurer Secret Manager</li>
+                        <li>Déployer Cloud Run #1 (Core API)</li>
+                        <li>Déployer Cloud Run #2 (Worker)</li>
+                        <li>Configurer domaine custom</li>
+                        <li>Setup SSL/TLS</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h4>🔐 Sécurité</h4>
+                    <ul class="checklist">
+                        <li>Firebase Auth configuré</li>
+                        <li>API Keys système en place</li>
+                        <li>Rate limiting activé</li>
+                        <li>Audit logging fonctionnel</li>
+                        <li>CORS configuré</li>
+                        <li>Webhooks signés (Tink)</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h4>🏦 Intégrations</h4>
+                    <ul class="checklist">
+                        <li>Tink OAuth flow complet</li>
+                        <li>Tink webhooks configurés</li>
+                        <li>1 provider facturation intégré</li>
+                        <li>Upload CSV fonctionnel</li>
+                        <li>Email notifications (SendGrid)</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h4>🤖 IA & Matching</h4>
+                    <ul class="checklist">
+                        <li>Vertex AI configuré</li>
+                        <li>Prompts de matching optimisés</li>
+                        <li>Seuils de confiance définis</li>
+                        <li>Matching manuel opérationnel</li>
+                        <li>Tests avec données réelles</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- FOOTER -->
+        <div style="text-align: center; padding: 30px; color: #606060; font-size: 0.9em;">
+            <p>Architecture MVP v2 - Union API - Janvier 2026</p>
+            <p>Réconciliation Bancaire SaaS • API-First • Scalable</p>
+        </div>
+    </div>
+</body>
+</html>

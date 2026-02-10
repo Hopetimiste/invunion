@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Roadmap MVP - Union API</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #e0e0e0;
+            line-height: 1.7;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            padding: 40px 20px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 20px;
+            margin-bottom: 30px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        h1 {
+            font-size: 2.5em;
+            background: linear-gradient(90deg, #00d4ff, #7c3aed, #f472b6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #a0a0a0;
+            font-size: 1.2em;
+        }
+        .last-updated {
+            color: #00d4ff;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+        .section {
+            background: rgba(255,255,255,0.05);
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 25px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        h2 {
+            color: #00d4ff;
+            font-size: 1.6em;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid rgba(0,212,255,0.3);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        h3 {
+            color: #7c3aed;
+            font-size: 1.2em;
+            margin: 20px 0 15px 0;
+        }
+        .phase {
+            background: rgba(255,255,255,0.03);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid;
+        }
+        .phase.completed {
+            border-left-color: #10b981;
+        }
+        .phase.in-progress {
+            border-left-color: #f59e0b;
+        }
+        .phase.pending {
+            border-left-color: #6b7280;
+        }
+        .phase-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .phase-title {
+            font-size: 1.3em;
+            font-weight: 600;
+        }
+        .phase.completed .phase-title {
+            color: #10b981;
+        }
+        .phase.in-progress .phase-title {
+            color: #f59e0b;
+        }
+        .phase.pending .phase-title {
+            color: #6b7280;
+        }
+        .status-badge {
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+        .status-badge.completed {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981;
+        }
+        .status-badge.in-progress {
+            background: rgba(245, 158, 11, 0.2);
+            color: #f59e0b;
+        }
+        .status-badge.pending {
+            background: rgba(107, 114, 128, 0.2);
+            color: #6b7280;
+        }
+        .task-list {
+            list-style: none;
+        }
+        .task-list li {
+            padding: 8px 0;
+            padding-left: 30px;
+            position: relative;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .task-list li:last-child {
+            border-bottom: none;
+        }
+        .task-list li::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 12px;
+            width: 18px;
+            height: 18px;
+            border-radius: 4px;
+            border: 2px solid;
+        }
+        .task-list li.done::before {
+            background: #10b981;
+            border-color: #10b981;
+        }
+        .task-list li.done::after {
+            content: '✓';
+            position: absolute;
+            left: 3px;
+            top: 10px;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .task-list li.in-progress::before {
+            border-color: #f59e0b;
+            background: rgba(245, 158, 11, 0.2);
+        }
+        .task-list li.pending::before {
+            border-color: #6b7280;
+        }
+        .task-list li.done {
+            color: #a0a0a0;
+        }
+        .endpoint {
+            background: rgba(0,0,0,0.3);
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.85em;
+            color: #00d4ff;
+        }
+        .tech-stack {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .tech-badge {
+            background: rgba(124, 58, 237, 0.2);
+            color: #a78bfa;
+            padding: 5px 12px;
+            border-radius: 6px;
+            font-size: 0.85em;
+        }
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .summary-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+        .summary-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .summary-number.green { color: #10b981; }
+        .summary-number.yellow { color: #f59e0b; }
+        .summary-number.gray { color: #6b7280; }
+        .summary-label {
+            color: #a0a0a0;
+            font-size: 0.9em;
+        }
+        .api-url {
+            background: rgba(0,212,255,0.1);
+            border: 1px solid rgba(0,212,255,0.3);
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            font-family: 'Fira Code', monospace;
+            word-break: break-all;
+        }
+        .api-url a {
+            color: #00d4ff;
+            text-decoration: none;
+        }
+        .api-url a:hover {
+            text-decoration: underline;
+        }
+        .note {
+            background: rgba(245, 158, 11, 0.1);
+            border-left: 4px solid #f59e0b;
+            padding: 15px;
+            border-radius: 0 8px 8px 0;
+            margin: 15px 0;
+        }
+        .timeline {
+            position: relative;
+            padding-left: 30px;
+        }
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 10px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: rgba(255,255,255,0.1);
+        }
+        .timeline-item {
+            position: relative;
+            margin-bottom: 25px;
+        }
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -24px;
+            top: 5px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #6b7280;
+        }
+        .timeline-item.done::before {
+            background: #10b981;
+        }
+        .timeline-item.current::before {
+            background: #f59e0b;
+            box-shadow: 0 0 10px #f59e0b;
+        }
+        .timeline-date {
+            color: #a0a0a0;
+            font-size: 0.85em;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Union API - Roadmap MVP</h1>
+            <p class="subtitle">Plateforme de réconciliation bancaire automatisée</p>
+            <p class="last-updated">Dernière mise à jour : 17 janvier 2026</p>
+        </div>
+
+        <!-- Summary -->
+        <div class="summary-grid">
+            <div class="summary-card">
+                <div class="summary-number green">3</div>
+                <div class="summary-label">Phases complétées</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-number yellow">1</div>
+                <div class="summary-label">En cours</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-number gray">2</div>
+                <div class="summary-label">À venir</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-number green">85%</div>
+                <div class="summary-label">MVP Backend</div>
+            </div>
+        </div>
+
+        <!-- Production URL -->
+        <div class="section">
+            <h2>🌐 API Production</h2>
+            <div class="api-url">
+                <a href="https://union-api-1024369822478.europe-west1.run.app/api/v1/health" target="_blank">
+                    https://union-api-1024369822478.europe-west1.run.app
+                </a>
+            </div>
+            <div class="tech-stack">
+                <span class="tech-badge">Cloud Run</span>
+                <span class="tech-badge">Cloud SQL PostgreSQL</span>
+                <span class="tech-badge">Firebase Auth</span>
+                <span class="tech-badge">Pub/Sub</span>
+                <span class="tech-badge">Secret Manager</span>
+                <span class="tech-badge">TypeScript</span>
+                <span class="tech-badge">Express.js</span>
+            </div>
+        </div>
+
+        <!-- Phase 1: Infrastructure -->
+        <div class="section">
+            <div class="phase completed">
+                <div class="phase-header">
+                    <span class="phase-title">📦 Phase 1 : Infrastructure GCP</span>
+                    <span class="status-badge completed">✓ Complété</span>
+                </div>
+                <ul class="task-list">
+                    <li class="done">Création projet GCP <code>br-project-481607</code></li>
+                    <li class="done">Cloud SQL PostgreSQL (union-db) avec schéma v2</li>
+                    <li class="done">Cloud Run service (union-api) déployé</li>
+                    <li class="done">Artifact Registry pour images Docker</li>
+                    <li class="done">Secret Manager pour credentials</li>
+                    <li class="done">Pub/Sub topics (union-ingest, union-matching, union-alerts)</li>
+                    <li class="done">Firebase Auth configuré avec custom claims</li>
+                    <li class="done">IAM & Service Accounts configurés</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Phase 2: Core API -->
+        <div class="section">
+            <div class="phase completed">
+                <div class="phase-header">
+                    <span class="phase-title">🔧 Phase 2 : Core API v2</span>
+                    <span class="status-badge completed">✓ Complété</span>
+                </div>
+                
+                <h3>Authentication</h3>
+                <ul class="task-list">
+                    <li class="done"><span class="endpoint">POST /auth/signup-tenant</span> - Création tenant + user + custom claims</li>
+                    <li class="done"><span class="endpoint">GET /auth/me</span> - Info utilisateur authentifié</li>
+                    <li class="done"><span class="endpoint">POST /auth/refresh-claims</span> - Refresh Firebase claims</li>
+                </ul>
+
+                <h3>Transactions (v2 schema)</h3>
+                <ul class="task-list">
+                    <li class="done"><span class="endpoint">GET /transactions</span> - Liste avec filtres, pagination, JOIN suppliers</li>
+                    <li class="done"><span class="endpoint">GET /transactions/:id</span> - Détail transaction</li>
+                    <li class="done"><span class="endpoint">POST /transactions</span> - Création (payment_method, payment_context, external_reference, etc.)</li>
+                    <li class="done"><span class="endpoint">PUT /transactions/:id</span> - Mise à jour</li>
+                    <li class="done"><span class="endpoint">DELETE /transactions/:id</span> - Suppression</li>
+                    <li class="done"><span class="endpoint">GET /transactions/stats</span> - Statistiques</li>
+                    <li class="done"><span class="endpoint">POST /transactions/bulk-update</span> - Mise à jour en masse</li>
+                </ul>
+
+                <h3>Invoices (v2 schema)</h3>
+                <ul class="task-list">
+                    <li class="done"><span class="endpoint">GET /invoices</span> - Liste avec filtres (recovery_percent, status)</li>
+                    <li class="done"><span class="endpoint">GET /invoices/:id</span> - Détail facture</li>
+                    <li class="done"><span class="endpoint">POST /invoices</span> - Création (amount_excl_vat, amount_incl_vat, invoice_date, etc.)</li>
+                    <li class="done"><span class="endpoint">PUT /invoices/:id</span> - Mise à jour</li>
+                    <li class="done"><span class="endpoint">DELETE /invoices/:id</span> - Suppression</li>
+                    <li class="done"><span class="endpoint">GET /invoices/stats</span> - Statistiques</li>
+                </ul>
+
+                <h3>Suppliers</h3>
+                <ul class="task-list">
+                    <li class="done"><span class="endpoint">GET /suppliers</span> - Liste fournisseurs</li>
+                    <li class="done"><span class="endpoint">GET /suppliers/:id</span> - Détail fournisseur</li>
+                    <li class="done"><span class="endpoint">POST /suppliers</span> - Création</li>
+                    <li class="done"><span class="endpoint">PUT /suppliers/:id</span> - Mise à jour</li>
+                    <li class="done"><span class="endpoint">DELETE /suppliers/:id</span> - Suppression</li>
+                </ul>
+
+                <h3>Matches (avec recovery tracking)</h3>
+                <ul class="task-list">
+                    <li class="done"><span class="endpoint">GET /matches</span> - Liste matches avec infos transaction/invoice</li>
+                    <li class="done"><span class="endpoint">GET /matches/:id</span> - Détail match</li>
+                    <li class="done"><span class="endpoint">POST /matches/manual</span> - Match manuel avec matched_amount</li>
+                    <li class="done"><span class="endpoint">PUT /matches/:id</span> - Mise à jour (cancel)</li>
+                    <li class="done"><span class="endpoint">DELETE /matches/:id</span> - Suppression</li>
+                    <li class="done"><span class="endpoint">GET /matches/stats</span> - Statistiques matching</li>
+                    <li class="done">Trigger DB auto-update recovery_percent sur invoice</li>
+                </ul>
+
+                <h3>Alerts</h3>
+                <ul class="task-list">
+                    <li class="done"><span class="endpoint">GET /alerts</span> - Liste alertes</li>
+                    <li class="done"><span class="endpoint">PUT /alerts/:id</span> - Marquer lu/dismissed</li>
+                    <li class="done"><span class="endpoint">POST /alerts/mark-all-read</span> - Tout marquer lu</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Phase 3: Database Schema v2 -->
+        <div class="section">
+            <div class="phase completed">
+                <div class="phase-header">
+                    <span class="phase-title">🗄️ Phase 3 : Database Schema v2</span>
+                    <span class="status-badge completed">✓ Complété</span>
+                </div>
+                <ul class="task-list">
+                    <li class="done">Table <code>tenants</code> avec metadata JSONB</li>
+                    <li class="done">Table <code>users</code> avec firebase_uid</li>
+                    <li class="done">Table <code>suppliers</code> (nouvelle)</li>
+                    <li class="done">Table <code>transactions</code> v2 : payment_method, payment_context, external_reference, description_original/display, supplier_id, added_at, status=unconsidered</li>
+                    <li class="done">Table <code>invoices</code> v2 : amount_excl_vat, amount_incl_vat, invoice_date, payment_expected_date, recovery_percent (0-100%), status enum updated</li>
+                    <li class="done">Table <code>matches</code> v2 : matched_amount pour partial matching</li>
+                    <li class="done">Table <code>bank_connections</code> multi-provider (tink, gocardless, salt_edge, plaid)</li>
+                    <li class="done">Table <code>bank_accounts</code></li>
+                    <li class="done">Trigger <code>update_invoice_recovery()</code> automatique</li>
+                    <li class="done">Indexes optimisés pour les requêtes fréquentes</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Phase 4: Integrations -->
+        <div class="section">
+            <div class="phase in-progress">
+                <div class="phase-header">
+                    <span class="phase-title">🔌 Phase 4 : Intégrations Externes</span>
+                    <span class="status-badge in-progress">En cours</span>
+                </div>
+                
+                <h3>Frontend Lovable</h3>
+                <ul class="task-list">
+                    <li class="in-progress">Configuration endpoints API</li>
+                    <li class="pending">Écrans transactions/invoices</li>
+                    <li class="pending">Interface de matching manuel</li>
+                    <li class="pending">Dashboard avec recovery tracking</li>
+                </ul>
+
+                <h3>n8n (Automatisation)</h3>
+                <ul class="task-list">
+                    <li class="pending">Workflow import transactions</li>
+                    <li class="pending">Workflow import invoices</li>
+                    <li class="pending">Webhook notifications</li>
+                </ul>
+
+                <h3>Open Banking (GoCardless/Tink)</h3>
+                <ul class="task-list">
+                    <li class="done">Architecture multi-provider prête</li>
+                    <li class="done">Endpoints <span class="endpoint">/connections/banking/*</span></li>
+                    <li class="pending">Intégration GoCardless Bank Account Data</li>
+                    <li class="pending">Intégration Tink</li>
+                    <li class="pending">Sync automatique transactions</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Phase 5: AI Matching -->
+        <div class="section">
+            <div class="phase pending">
+                <div class="phase-header">
+                    <span class="phase-title">🤖 Phase 5 : AI Matching</span>
+                    <span class="status-badge pending">À venir</span>
+                </div>
+                <ul class="task-list">
+                    <li class="pending">Intégration Vertex AI (Gemini)</li>
+                    <li class="pending">Algorithme de matching intelligent</li>
+                    <li class="pending">Score de confiance automatique</li>
+                    <li class="pending">Suggestions de match</li>
+                    <li class="pending">Apprentissage des patterns utilisateur</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Phase 6: Production Ready -->
+        <div class="section">
+            <div class="phase pending">
+                <div class="phase-header">
+                    <span class="phase-title">🚀 Phase 6 : Production Ready</span>
+                    <span class="status-badge pending">À venir</span>
+                </div>
+                <ul class="task-list">
+                    <li class="pending">Tests E2E complets</li>
+                    <li class="pending">Monitoring & Alerting Cloud</li>
+                    <li class="pending">Documentation API (OpenAPI/Swagger)</li>
+                    <li class="pending">Rate limiting par tenant</li>
+                    <li class="pending">Audit logs</li>
+                    <li class="pending">Backup automatique DB</li>
+                    <li class="pending">CI/CD pipeline (GitHub Actions)</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Timeline -->
+        <div class="section">
+            <h2>📅 Timeline</h2>
+            <div class="timeline">
+                <div class="timeline-item done">
+                    <div class="timeline-date">10-11 Janvier 2026</div>
+                    <div>Infrastructure GCP + Cloud SQL + Cloud Run</div>
+                </div>
+                <div class="timeline-item done">
+                    <div class="timeline-date">12-15 Janvier 2026</div>
+                    <div>Core API v1 + Authentication Firebase</div>
+                </div>
+                <div class="timeline-item done">
+                    <div class="timeline-date">16-17 Janvier 2026</div>
+                    <div>Schema v2 + CRUD complet + Recovery tracking</div>
+                </div>
+                <div class="timeline-item current">
+                    <div class="timeline-date">18-24 Janvier 2026</div>
+                    <div>Intégrations (Lovable, n8n, Open Banking)</div>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-date">25-31 Janvier 2026</div>
+                    <div>AI Matching + Tests + Production</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notes -->
+        <div class="section">
+            <h2>📝 Notes</h2>
+            <div class="note">
+                <strong>Architecture :</strong> Frontend sur Lovable, Backend API sur Cloud Run, 
+                Automatisation via n8n. Pas de Worker Service séparé pour le MVP - 
+                le matching peut être fait directement dans l'API ou via n8n.
+            </div>
+            <div class="note">
+                <strong>Multi-tenancy :</strong> Chaque utilisateur appartient à un tenant (UUID). 
+                Toutes les données sont isolées par tenant_id. Les custom claims Firebase 
+                contiennent le tenantId et le role.
+            </div>
+            <div class="note">
+                <strong>Recovery Tracking :</strong> Le champ recovery_percent sur les invoices 
+                représente le pourcentage du montant total récupéré via les matches. 
+                Un trigger DB met à jour automatiquement ce champ et le status de la facture.
+            </div>
+        </div>
+
+        <!-- GitHub -->
+        <div class="section">
+            <h2>💻 Repository</h2>
+            <div class="api-url">
+                <a href="https://github.com/Hopetimiste/union" target="_blank">
+                    https://github.com/Hopetimiste/union
+                </a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

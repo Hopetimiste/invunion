@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analyse Pricing - SaaS Réconciliation Bancaire</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+    </script>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --gray: #6b7280;
+        }
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f8fafc;
+            color: #1e293b;
+            line-height: 1.6;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #0f172a;
+            border-bottom: 3px solid var(--primary);
+            padding-bottom: 15px;
+        }
+        h2 {
+            color: #334155;
+            margin-top: 40px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        h3 { color: #475569; margin-top: 25px; }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+        th {
+            background: #1e293b;
+            color: white;
+            padding: 12px 15px;
+            text-align: left;
+            font-weight: 600;
+        }
+        td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        tr:hover { background: #f8fafc; }
+        .text-right { text-align: right; }
+        .text-center { text-align: center; }
+        
+        .cost-card {
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 15px 0;
+        }
+        .cost-total {
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            color: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            font-size: 18px;
+        }
+        .cost-total .amount {
+            font-size: 32px;
+            font-weight: bold;
+        }
+        
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin: 30px 0;
+        }
+        .pricing-card {
+            border: 2px solid #e2e8f0;
+            border-radius: 16px;
+            padding: 30px;
+            text-align: center;
+            transition: all 0.3s;
+        }
+        .pricing-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-5px);
+            box-shadow: 0 10px 40px rgba(37, 99, 235, 0.15);
+        }
+        .pricing-card.popular {
+            border-color: var(--primary);
+            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+            position: relative;
+        }
+        .pricing-card.popular::before {
+            content: "POPULAIRE";
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--primary);
+            color: white;
+            padding: 4px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .pricing-card h3 {
+            margin: 0 0 10px 0;
+            color: #1e293b;
+        }
+        .pricing-card .price {
+            font-size: 48px;
+            font-weight: bold;
+            color: var(--primary);
+        }
+        .pricing-card .price span {
+            font-size: 16px;
+            color: var(--gray);
+            font-weight: normal;
+        }
+        .pricing-card .features {
+            text-align: left;
+            margin: 20px 0;
+            padding: 0;
+            list-style: none;
+        }
+        .pricing-card .features li {
+            padding: 8px 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .pricing-card .features li::before {
+            content: "✓";
+            color: var(--success);
+            margin-right: 10px;
+            font-weight: bold;
+        }
+        
+        .alert {
+            padding: 16px 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .alert-warning {
+            background: #fef3c7;
+            border-left: 4px solid var(--warning);
+            color: #92400e;
+        }
+        .alert-info {
+            background: #dbeafe;
+            border-left: 4px solid var(--primary);
+            color: #1e40af;
+        }
+        .alert-success {
+            background: #d1fae5;
+            border-left: 4px solid var(--success);
+            color: #065f46;
+        }
+        
+        .formula {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Fira Code', monospace;
+            margin: 15px 0;
+        }
+        .formula .highlight {
+            color: #fbbf24;
+            font-weight: bold;
+        }
+        
+        .comparison-table th:first-child { width: 40%; }
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .badge-green { background: #d1fae5; color: #065f46; }
+        .badge-yellow { background: #fef3c7; color: #92400e; }
+        .badge-red { background: #fee2e2; color: #991b1b; }
+        .badge-blue { background: #dbeafe; color: #1e40af; }
+        
+        .mermaid {
+            background: #f8fafc;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        
+        .scenario {
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 25px;
+            margin: 20px 0;
+        }
+        .scenario h4 {
+            margin-top: 0;
+            color: var(--primary);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>💰 Analyse Pricing - SaaS Réconciliation Bancaire</h1>
+        <p><strong>Marché cible</strong> : Europe (PME, TPE, Comptables)</p>
+
+        <!-- ==================== SECTION 1: COÛTS ==================== -->
+        <h2>📊 1. Analyse des Coûts Complets</h2>
+
+        <h3>1.1 Coûts Infrastructure (GCP) - Phase MVP</h3>
+        <table>
+            <tr>
+                <th>Service</th>
+                <th>Configuration</th>
+                <th>Coût/mois</th>
+            </tr>
+            <tr>
+                <td>Cloud SQL PostgreSQL</td>
+                <td>1 vCPU, 4GB RAM, 50GB SSD, backup auto</td>
+                <td class="text-right">~60€</td>
+            </tr>
+            <tr>
+                <td>Cloud Run (Core API)</td>
+                <td>Scale to zero, max 3 instances</td>
+                <td class="text-right">~15€</td>
+            </tr>
+            <tr>
+                <td>Secret Manager</td>
+                <td>~10 secrets</td>
+                <td class="text-right">~1€</td>
+            </tr>
+            <tr>
+                <td>Cloud Logging</td>
+                <td>Premiers 50GB gratuits</td>
+                <td class="text-right">~5€</td>
+            </tr>
+            <tr style="background: #f1f5f9; font-weight: bold;">
+                <td colspan="2">Sous-total Infrastructure</td>
+                <td class="text-right">~81€</td>
+            </tr>
+        </table>
+
+        <h3>1.2 Coûts Services SaaS Externes</h3>
+        <table>
+            <tr>
+                <th>Service</th>
+                <th>Usage</th>
+                <th>Pricing</th>
+                <th>Coût estimé/mois</th>
+            </tr>
+            <tr>
+                <td><strong>🏦 Tink</strong> (API Bancaire)</td>
+                <td>Connexion banques Europe</td>
+                <td>~0.50€/connexion/mois + setup</td>
+                <td class="text-right">Variable*</td>
+            </tr>
+            <tr>
+                <td><strong>💳 Stripe</strong> (Paiements)</td>
+                <td>Encaissement abonnements</td>
+                <td>1.5% + 0.25€ / transaction (Europe)</td>
+                <td class="text-right">Variable**</td>
+            </tr>
+            <tr>
+                <td><strong>📧 Resend</strong> (Emails)</td>
+                <td>Emails transactionnels</td>
+                <td>Free tier 3k/mois, puis $20/mois</td>
+                <td class="text-right">0-20€</td>
+            </tr>
+            <tr>
+                <td><strong>🐙 n8n Cloud</strong></td>
+                <td>Orchestration workflows</td>
+                <td>Starter $20/mois</td>
+                <td class="text-right">~20€</td>
+            </tr>
+            <tr>
+                <td><strong>🌐 Vercel</strong> (Frontend)</td>
+                <td>Hosting React</td>
+                <td>Pro $20/mois (ou Free)</td>
+                <td class="text-right">0-20€</td>
+            </tr>
+            <tr>
+                <td><strong>🐛 Sentry</strong> (Error tracking)</td>
+                <td>Monitoring erreurs</td>
+                <td>Free tier 5k events/mois</td>
+                <td class="text-right">0€</td>
+            </tr>
+            <tr>
+                <td><strong>💬 Crisp</strong> (Support)</td>
+                <td>Chat support client</td>
+                <td>Free tier ou Pro 25€/mois</td>
+                <td class="text-right">0-25€</td>
+            </tr>
+            <tr>
+                <td><strong>🔐 Firebase Auth</strong></td>
+                <td>Authentification</td>
+                <td>Free jusqu'à 50k MAU</td>
+                <td class="text-right">0€</td>
+            </tr>
+            <tr>
+                <td><strong>🌍 Domaine + DNS</strong></td>
+                <td>union-api.com ou similaire</td>
+                <td>~15€/an</td>
+                <td class="text-right">~1€</td>
+            </tr>
+            <tr style="background: #f1f5f9; font-weight: bold;">
+                <td colspan="3">Sous-total Services SaaS (fixe)</td>
+                <td class="text-right">~40-85€</td>
+            </tr>
+        </table>
+
+        <div class="alert alert-warning">
+            <strong>⚠️ Coût Tink - Point d'attention majeur</strong>
+            <p>Tink facture généralement :</p>
+            <ul>
+                <li><strong>Setup fee</strong> : 500€ - 5,000€ (négociable)</li>
+                <li><strong>Par connexion active/mois</strong> : 0.30€ - 1€</li>
+                <li><strong>Par requête API</strong> : inclus ou 0.01€</li>
+            </ul>
+            <p>💡 <strong>Alternative</strong> : <a href="https://gocardless.com/bank-account-data/">GoCardless Bank Account Data</a> (ex-Nordigen) - Free tier disponible !</p>
+        </div>
+
+        <h3>1.3 Coûts Variables (par client/transaction)</h3>
+        <table>
+            <tr>
+                <th>Coût</th>
+                <th>Déclencheur</th>
+                <th>Montant</th>
+            </tr>
+            <tr>
+                <td>Stripe (paiement client)</td>
+                <td>Chaque paiement reçu</td>
+                <td>1.5% + 0.25€</td>
+            </tr>
+            <tr>
+                <td>Tink / GoCardless</td>
+                <td>Par connexion bancaire active</td>
+                <td>~0.50€/connexion/mois</td>
+            </tr>
+            <tr>
+                <td>Cloud SQL (stockage)</td>
+                <td>+1M transactions</td>
+                <td>+10€/10GB</td>
+            </tr>
+            <tr>
+                <td>Cloud Run (compute)</td>
+                <td>+1000 req/jour</td>
+                <td>~+5€</td>
+            </tr>
+        </table>
+
+        <h3>1.4 Coûts Business / Légaux (Europe)</h3>
+        <table>
+            <tr>
+                <th>Poste</th>
+                <th>Description</th>
+                <th>Coût estimé</th>
+            </tr>
+            <tr>
+                <td><strong>Comptabilité</strong></td>
+                <td>Expert-comptable SaaS</td>
+                <td>100-300€/mois</td>
+            </tr>
+            <tr>
+                <td><strong>Juridique</strong></td>
+                <td>CGV, CGU, DPA (one-shot puis maintenance)</td>
+                <td>~50€/mois amorti</td>
+            </tr>
+            <tr>
+                <td><strong>RGPD</strong></td>
+                <td>Registre, DPO externe si nécessaire</td>
+                <td>0-100€/mois</td>
+            </tr>
+            <tr>
+                <td><strong>Assurance RC Pro</strong></td>
+                <td>Obligatoire pour données financières</td>
+                <td>50-150€/mois</td>
+            </tr>
+            <tr style="background: #f1f5f9; font-weight: bold;">
+                <td colspan="2">Sous-total Business/Légal</td>
+                <td>200-600€/mois</td>
+            </tr>
+        </table>
+
+        <!-- TOTAL COSTS -->
+        <div class="cost-total">
+            <h3 style="margin-top: 0; color: #94a3b8;">💶 Coûts Totaux Mensuels (MVP, 50-100 clients)</h3>
+            <table style="color: white; margin: 0;">
+                <tr>
+                    <td>Infrastructure GCP</td>
+                    <td class="text-right">~81€</td>
+                </tr>
+                <tr>
+                    <td>Services SaaS</td>
+                    <td class="text-right">~60€</td>
+                </tr>
+                <tr>
+                    <td>Tink/GoCardless (100 connexions)</td>
+                    <td class="text-right">~50€</td>
+                </tr>
+                <tr>
+                    <td>Business/Légal (minimal)</td>
+                    <td class="text-right">~250€</td>
+                </tr>
+                <tr style="border-top: 2px solid #475569;">
+                    <td><strong>TOTAL FIXE</strong></td>
+                    <td class="text-right"><span class="amount">~440€/mois</span></td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- ==================== SECTION 2: PRICING MODELS ==================== -->
+        <h2>💵 2. Modèles de Pricing</h2>
+
+        <h3>2.1 Calcul du Prix Minimum</h3>
+
+        <div class="formula">
+            <strong>Formule de pricing :</strong><br><br>
+            Prix minimum = (Coûts fixes / Nb clients) + Coûts variables par client + <span class="highlight">Marge (50-70%)</span><br><br>
+            <strong>Exemple avec 50 clients :</strong><br>
+            = (440€ / 50) + 0.50€ (Tink) + marge<br>
+            = 8.80€ + 0.50€ = <span class="highlight">9.30€ coût de revient</span><br>
+            = 9.30€ × 2 (marge 50%) = <span class="highlight">~19€ prix minimum viable</span>
+        </div>
+
+        <div class="alert alert-info">
+            <strong>📊 Benchmark marché Europe (réconciliation bancaire) :</strong>
+            <ul>
+                <li><strong>Agicap</strong> : 99€ - 399€/mois</li>
+                <li><strong>Pennylane</strong> : 49€ - 149€/mois</li>
+                <li><strong>Qonto</strong> : 9€ - 299€/mois (banque + outils)</li>
+                <li><strong>Libeo</strong> : 49€ - 149€/mois</li>
+                <li><strong>Spendesk</strong> : 99€+ /mois</li>
+            </ul>
+            <p>👉 Le marché accepte des prix entre <strong>29€ et 149€/mois</strong> pour ce type de solution.</p>
+        </div>
+
+        <!-- ==================== SECTION 3: GRILLE TARIFAIRE MENSUELLE ==================== -->
+        <h2>📋 3. Grille Tarifaire - Abonnement Mensuel</h2>
+
+        <div class="pricing-grid">
+            <div class="pricing-card">
+                <h3>Starter</h3>
+                <p style="color: var(--gray);">TPE / Freelances</p>
+                <div class="price">29€<span>/mois</span></div>
+                <ul class="features">
+                    <li>1 compte bancaire</li>
+                    <li>500 transactions/mois</li>
+                    <li>100 factures/mois</li>
+                    <li>Matching automatique</li>
+                    <li>Export CSV</li>
+                    <li>Support email</li>
+                </ul>
+            </div>
+            
+            <div class="pricing-card popular">
+                <h3>Pro</h3>
+                <p style="color: var(--gray);">PME</p>
+                <div class="price">79€<span>/mois</span></div>
+                <ul class="features">
+                    <li>5 comptes bancaires</li>
+                    <li>5,000 transactions/mois</li>
+                    <li>1,000 factures/mois</li>
+                    <li>Matching IA avancé</li>
+                    <li>API access</li>
+                    <li>Intégrations ERP</li>
+                    <li>Support prioritaire</li>
+                </ul>
+            </div>
+            
+            <div class="pricing-card">
+                <h3>Business</h3>
+                <p style="color: var(--gray);">ETI / Groupes</p>
+                <div class="price">199€<span>/mois</span></div>
+                <ul class="features">
+                    <li>Comptes illimités</li>
+                    <li>Transactions illimitées</li>
+                    <li>Factures illimitées</li>
+                    <li>Multi-entités</li>
+                    <li>Règles personnalisées</li>
+                    <li>Webhooks</li>
+                    <li>SLA 99.9%</li>
+                    <li>Support dédié</li>
+                </ul>
+            </div>
+        </div>
+
+        <h3>Analyse de rentabilité - Abonnement</h3>
+        <table>
+            <tr>
+                <th>Plan</th>
+                <th>Prix</th>
+                <th>Coût de revient*</th>
+                <th>Marge brute</th>
+                <th>Clients pour breakeven</th>
+            </tr>
+            <tr>
+                <td>Starter</td>
+                <td>29€</td>
+                <td>~12€</td>
+                <td><span class="badge badge-yellow">59%</span></td>
+                <td>26 clients</td>
+            </tr>
+            <tr>
+                <td>Pro</td>
+                <td>79€</td>
+                <td>~20€</td>
+                <td><span class="badge badge-green">75%</span></td>
+                <td>8 clients</td>
+            </tr>
+            <tr>
+                <td>Business</td>
+                <td>199€</td>
+                <td>~40€</td>
+                <td><span class="badge badge-green">80%</span></td>
+                <td>3 clients</td>
+            </tr>
+        </table>
+        <p><small>* Coût de revient = quote-part infrastructure + Tink + support estimé</small></p>
+
+        <!-- ==================== SECTION 4: PRICING À LA CONSOMMATION ==================== -->
+        <h2>📈 4. Grille Tarifaire - À la Consommation</h2>
+
+        <div class="alert alert-success">
+            <strong>✅ Avantages du pricing à la consommation :</strong>
+            <ul>
+                <li>Barrière d'entrée plus basse (acquisition facile)</li>
+                <li>Revenus scalent avec l'usage du client</li>
+                <li>Perçu comme "juste" par les clients</li>
+                <li>Adapté aux activités saisonnières</li>
+            </ul>
+        </div>
+
+        <h3>Option A : Prix par transaction réconciliée</h3>
+        <table>
+            <tr>
+                <th>Volume mensuel</th>
+                <th>Prix / transaction</th>
+                <th>Minimum mensuel</th>
+            </tr>
+            <tr>
+                <td>0 - 500</td>
+                <td>0.15€</td>
+                <td>9€ (60 transactions min)</td>
+            </tr>
+            <tr>
+                <td>501 - 2,000</td>
+                <td>0.10€</td>
+                <td>-</td>
+            </tr>
+            <tr>
+                <td>2,001 - 10,000</td>
+                <td>0.07€</td>
+                <td>-</td>
+            </tr>
+            <tr>
+                <td>10,001+</td>
+                <td>0.04€</td>
+                <td>-</td>
+            </tr>
+        </table>
+
+        <h3>Option B : Prix par connexion bancaire + transactions</h3>
+        <table>
+            <tr>
+                <th>Composant</th>
+                <th>Prix</th>
+                <th>Inclus</th>
+            </tr>
+            <tr>
+                <td>Connexion bancaire</td>
+                <td>5€/mois/compte</td>
+                <td>Sync quotidienne, 500 transactions incluses</td>
+            </tr>
+            <tr>
+                <td>Transactions supplémentaires</td>
+                <td>0.05€/transaction</td>
+                <td>Au-delà des 500 incluses</td>
+            </tr>
+            <tr>
+                <td>Facture importée</td>
+                <td>0.10€/facture</td>
+                <td>-</td>
+            </tr>
+            <tr>
+                <td>Match automatique</td>
+                <td>0.05€/match</td>
+                <td>-</td>
+            </tr>
+        </table>
+
+        <h3>Option C : Hybride (Recommandé) 🌟</h3>
+        <div class="cost-card">
+            <h4 style="margin-top: 0;">Base + Consommation</h4>
+            <table>
+                <tr>
+                    <th>Plan</th>
+                    <th>Base mensuelle</th>
+                    <th>Inclus</th>
+                    <th>Surplus</th>
+                </tr>
+                <tr>
+                    <td><strong>Starter</strong></td>
+                    <td>19€/mois</td>
+                    <td>1 compte, 300 transactions</td>
+                    <td>+0.08€/transaction</td>
+                </tr>
+                <tr>
+                    <td><strong>Pro</strong></td>
+                    <td>49€/mois</td>
+                    <td>5 comptes, 2,000 transactions</td>
+                    <td>+0.05€/transaction</td>
+                </tr>
+                <tr>
+                    <td><strong>Business</strong></td>
+                    <td>149€/mois</td>
+                    <td>Illimité comptes, 10,000 transactions</td>
+                    <td>+0.03€/transaction</td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- ==================== SECTION 5: SIMULATIONS ==================== -->
+        <h2>🧮 5. Simulations de Revenus</h2>
+
+        <h3>Scénario 1 : 50 clients (6 mois après lancement)</h3>
+        <div class="scenario">
+            <h4>Mix clients estimé</h4>
+            <table>
+                <tr>
+                    <th>Plan</th>
+                    <th>Nb clients</th>
+                    <th>Prix</th>
+                    <th>MRR</th>
+                </tr>
+                <tr>
+                    <td>Starter (19€)</td>
+                    <td>30</td>
+                    <td>19€</td>
+                    <td>570€</td>
+                </tr>
+                <tr>
+                    <td>Pro (49€)</td>
+                    <td>15</td>
+                    <td>49€</td>
+                    <td>735€</td>
+                </tr>
+                <tr>
+                    <td>Business (149€)</td>
+                    <td>5</td>
+                    <td>149€</td>
+                    <td>745€</td>
+                </tr>
+                <tr style="background: #f1f5f9; font-weight: bold;">
+                    <td colspan="3">MRR Total</td>
+                    <td>2,050€</td>
+                </tr>
+                <tr>
+                    <td colspan="3">Surplus consommation estimé (~20%)</td>
+                    <td>+410€</td>
+                </tr>
+                <tr style="background: #dcfce7; font-weight: bold;">
+                    <td colspan="3">Revenue Total</td>
+                    <td>~2,460€/mois</td>
+                </tr>
+            </table>
+            
+            <div style="display: flex; gap: 20px; margin-top: 20px;">
+                <div style="flex: 1; background: #fee2e2; padding: 15px; border-radius: 8px;">
+                    <strong>Coûts</strong><br>
+                    <span style="font-size: 24px; color: #991b1b;">~600€</span>
+                </div>
+                <div style="flex: 1; background: #dcfce7; padding: 15px; border-radius: 8px;">
+                    <strong>Profit</strong><br>
+                    <span style="font-size: 24px; color: #166534;">~1,860€/mois</span>
+                </div>
+                <div style="flex: 1; background: #dbeafe; padding: 15px; border-radius: 8px;">
+                    <strong>Marge</strong><br>
+                    <span style="font-size: 24px; color: #1e40af;">~76%</span>
+                </div>
+            </div>
+        </div>
+
+        <h3>Scénario 2 : 200 clients (12 mois après lancement)</h3>
+        <div class="scenario">
+            <h4>Mix clients estimé</h4>
+            <table>
+                <tr>
+                    <th>Plan</th>
+                    <th>Nb clients</th>
+                    <th>Prix</th>
+                    <th>MRR</th>
+                </tr>
+                <tr>
+                    <td>Starter (19€)</td>
+                    <td>100</td>
+                    <td>19€</td>
+                    <td>1,900€</td>
+                </tr>
+                <tr>
+                    <td>Pro (49€)</td>
+                    <td>70</td>
+                    <td>49€</td>
+                    <td>3,430€</td>
+                </tr>
+                <tr>
+                    <td>Business (149€)</td>
+                    <td>30</td>
+                    <td>149€</td>
+                    <td>4,470€</td>
+                </tr>
+                <tr style="background: #f1f5f9; font-weight: bold;">
+                    <td colspan="3">MRR Total</td>
+                    <td>9,800€</td>
+                </tr>
+                <tr>
+                    <td colspan="3">Surplus consommation estimé (~25%)</td>
+                    <td>+2,450€</td>
+                </tr>
+                <tr style="background: #dcfce7; font-weight: bold;">
+                    <td colspan="3">Revenue Total</td>
+                    <td>~12,250€/mois</td>
+                </tr>
+            </table>
+            
+            <div style="display: flex; gap: 20px; margin-top: 20px;">
+                <div style="flex: 1; background: #fee2e2; padding: 15px; border-radius: 8px;">
+                    <strong>Coûts (Phase 2)</strong><br>
+                    <span style="font-size: 24px; color: #991b1b;">~1,500€</span>
+                </div>
+                <div style="flex: 1; background: #dcfce7; padding: 15px; border-radius: 8px;">
+                    <strong>Profit</strong><br>
+                    <span style="font-size: 24px; color: #166534;">~10,750€/mois</span>
+                </div>
+                <div style="flex: 1; background: #dbeafe; padding: 15px; border-radius: 8px;">
+                    <strong>Marge</strong><br>
+                    <span style="font-size: 24px; color: #1e40af;">~88%</span>
+                </div>
+            </div>
+        </div>
+
+        <h3>Scénario 3 : Pricing 100% consommation</h3>
+        <div class="scenario">
+            <h4>Client type : PME avec 3 comptes, 1500 transactions/mois</h4>
+            <table>
+                <tr>
+                    <th>Composant</th>
+                    <th>Quantité</th>
+                    <th>Prix unitaire</th>
+                    <th>Total</th>
+                </tr>
+                <tr>
+                    <td>Connexions bancaires</td>
+                    <td>3</td>
+                    <td>5€</td>
+                    <td>15€</td>
+                </tr>
+                <tr>
+                    <td>Transactions (500 × 3 incluses)</td>
+                    <td>1,500</td>
+                    <td>inclus</td>
+                    <td>0€</td>
+                </tr>
+                <tr>
+                    <td>Transactions supplémentaires</td>
+                    <td>0</td>
+                    <td>0.05€</td>
+                    <td>0€</td>
+                </tr>
+                <tr>
+                    <td>Factures importées</td>
+                    <td>200</td>
+                    <td>0.10€</td>
+                    <td>20€</td>
+                </tr>
+                <tr>
+                    <td>Matchs automatiques</td>
+                    <td>180</td>
+                    <td>0.05€</td>
+                    <td>9€</td>
+                </tr>
+                <tr style="background: #f1f5f9; font-weight: bold;">
+                    <td colspan="3">Facture client</td>
+                    <td>44€/mois</td>
+                </tr>
+            </table>
+            <p><em>→ Comparable au plan Pro à 49€, mais perçu comme plus "juste" par le client.</em></p>
+        </div>
+
+        <!-- ==================== SECTION 6: RECOMMANDATION ==================== -->
+        <h2>🎯 6. Recommandation Finale</h2>
+
+        <div class="alert alert-success">
+            <h3 style="margin-top: 0;">Grille tarifaire recommandée</h3>
+        </div>
+
+        <div class="pricing-grid">
+            <div class="pricing-card">
+                <h3>🌱 Starter</h3>
+                <div class="price">19€<span>/mois</span></div>
+                <p style="font-size: 14px; color: var(--gray);">+ 0.08€/transaction au-delà de 300</p>
+                <ul class="features">
+                    <li>1 compte bancaire</li>
+                    <li>300 transactions incluses</li>
+                    <li>Import factures manuel</li>
+                    <li>Matching automatique</li>
+                    <li>Export CSV</li>
+                </ul>
+                <p><span class="badge badge-blue">Coût de revient : ~8€</span></p>
+            </div>
+            
+            <div class="pricing-card popular">
+                <h3>🚀 Pro</h3>
+                <div class="price">49€<span>/mois</span></div>
+                <p style="font-size: 14px; color: var(--gray);">+ 0.05€/transaction au-delà de 2,000</p>
+                <ul class="features">
+                    <li>5 comptes bancaires</li>
+                    <li>2,000 transactions incluses</li>
+                    <li>Intégrations ERP</li>
+                    <li>Matching IA</li>
+                    <li>API access</li>
+                    <li>Support prioritaire</li>
+                </ul>
+                <p><span class="badge badge-green">Marge : ~75%</span></p>
+            </div>
+            
+            <div class="pricing-card">
+                <h3>🏢 Business</h3>
+                <div class="price">149€<span>/mois</span></div>
+                <p style="font-size: 14px; color: var(--gray);">+ 0.03€/transaction au-delà de 10,000</p>
+                <ul class="features">
+                    <li>Comptes illimités</li>
+                    <li>10,000 transactions incluses</li>
+                    <li>Multi-entités</li>
+                    <li>Règles personnalisées</li>
+                    <li>Webhooks & API avancée</li>
+                    <li>SLA 99.9%</li>
+                    <li>Support dédié</li>
+                </ul>
+                <p><span class="badge badge-green">Marge : ~85%</span></p>
+            </div>
+        </div>
+
+        <h3>Pourquoi cette grille ?</h3>
+        <table class="comparison-table">
+            <tr>
+                <th>Critère</th>
+                <th>Décision</th>
+            </tr>
+            <tr>
+                <td>Prix d'entrée à 19€</td>
+                <td>Sous la barre psychologique des 20€, accessible aux TPE/freelances</td>
+            </tr>
+            <tr>
+                <td>Plan Pro à 49€</td>
+                <td>Sweet spot du marché B2B SaaS, perçu comme "sérieux" mais accessible</td>
+            </tr>
+            <tr>
+                <td>Plan Business à 149€</td>
+                <td>Sous les 200€ (budget validable sans approbation supérieure dans beaucoup de PME)</td>
+            </tr>
+            <tr>
+                <td>Hybride base + consommation</td>
+                <td>Revenue prévisible (base) + upside sur gros clients (consommation)</td>
+            </tr>
+            <tr>
+                <td>Pas de plan gratuit</td>
+                <td>Évite les "tire-kickers", attire des clients sérieux dès le début</td>
+            </tr>
+        </table>
+
+        <h3>💡 Tips de pricing</h3>
+        <ul>
+            <li><strong>Affiche "HT" en B2B</strong> - Les entreprises pensent en HT</li>
+            <li><strong>Propose -20% annuel</strong> - 19€ × 12 = 228€ → 190€/an (fidélisation + trésorerie)</li>
+            <li><strong>Trial 14 jours</strong> - Sans CB pour Starter, avec CB pour Pro/Business</li>
+            <li><strong>Augmente les prix tôt</strong> - Plus facile d'augmenter avec 50 clients qu'avec 500</li>
+        </ul>
+
+        <!-- ==================== BREAKEVEN ==================== -->
+        <h2>📊 7. Seuil de Rentabilité</h2>
+
+        <div class="mermaid">
+xychart-beta
+    title "Breakeven Analysis"
+    x-axis ["10", "20", "30", "40", "50", "60", "70", "80", "90", "100"]
+    y-axis "€/mois" 0 --> 5000
+    line "Revenue" [380, 760, 1140, 1520, 1900, 2280, 2660, 3040, 3420, 3800]
+    line "Coûts" [500, 550, 600, 650, 700, 750, 800, 850, 900, 950]
+        </div>
+
+        <div class="cost-card">
+            <h4 style="margin-top: 0;">🎯 Breakeven estimé</h4>
+            <table>
+                <tr>
+                    <th>Métrique</th>
+                    <th>Valeur</th>
+                </tr>
+                <tr>
+                    <td>ARPU moyen (mix de plans)</td>
+                    <td>~38€/mois</td>
+                </tr>
+                <tr>
+                    <td>Coûts fixes mensuels</td>
+                    <td>~440€</td>
+                </tr>
+                <tr>
+                    <td>Coût variable par client</td>
+                    <td>~5€</td>
+                </tr>
+                <tr style="background: #dcfce7; font-weight: bold;">
+                    <td>Breakeven</td>
+                    <td>~14 clients</td>
+                </tr>
+            </table>
+            <p><strong>Formule</strong> : 440€ / (38€ - 5€) = 13.3 clients</p>
+        </div>
+
+        <div class="alert alert-info">
+            <strong>🚀 Objectif réaliste</strong> : Breakeven en 2-3 mois avec une bonne stratégie d'acquisition (Product Hunt, LinkedIn, SEO).
+        </div>
+
+        <h2>📝 Résumé Exécutif</h2>
+        <table>
+            <tr>
+                <th>Métrique</th>
+                <th>Valeur</th>
+            </tr>
+            <tr>
+                <td>Prix minimum viable</td>
+                <td><strong>19€/mois</strong></td>
+            </tr>
+            <tr>
+                <td>Prix recommandé (sweet spot)</td>
+                <td><strong>49€/mois</strong></td>
+            </tr>
+            <tr>
+                <td>Coûts mensuels (MVP, 50 clients)</td>
+                <td>~600€</td>
+            </tr>
+            <tr>
+                <td>Breakeven</td>
+                <td>~14 clients</td>
+            </tr>
+            <tr>
+                <td>Marge brute cible</td>
+                <td>70-85%</td>
+            </tr>
+            <tr>
+                <td>MRR objectif Year 1</td>
+                <td>10,000€ (~200 clients)</td>
+            </tr>
+        </table>
+
+        <p style="text-align: center; margin-top: 40px; color: var(--gray);">
+            <em>Documents liés : 
+                <a href="architecture-mvp.html">Architecture MVP</a> | 
+                <a href="architecture-diagram.html">Architecture complète</a>
+            </em>
+        </p>
+    </div>
+</body>
+</html>

@@ -1,0 +1,270 @@
+{
+  "name": "Tink Link - Standard Flow (Fix)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "tink/init-connection",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook - Init Connection",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [0, 0],
+      "id": "webhook-init",
+      "webhookId": "tink-init-connection",
+      "notes": "Receives request from backend to start flow"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build Tink Link URL - Standard Flow\n// We do NOT pre-create the user. We let Tink create it JIT in the Sandbox.\n\nconst webhookData = $('Webhook - Init Connection').item.json.body;\n\n// CONFIGURATION\nconst clientId = '45c7abdaa6a147768f78db1de03944a0'; \n// CRITICAL: Ensure this matches your Tink Console Redirect URIs\n// Use 'webhook' instead of 'webhook-test' when going live.\nconst redirectUri = 'https://n8n.cloud/webhook-test/tink/callback'; \n\nconst market = webhookData.market || 'FR';\nconst locale = webhookData.locale || 'en_US';\n\n// Pass tenantId in state so we know who is connecting\nconst stateObj = {\n  tenantId: webhookData.tenantId,\n  connectionId: webhookData.connectionId\n};\n\n// --- MANUAL PARAMETER CONSTRUCTION ---\nconst params = [];\n\n// 1. Client & Redirect\nparams.push('client_id=' + clientId);\nparams.push('redirect_uri=' + encodeURIComponent(redirectUri));\n\n// 2. Scopes (Required for Standard Flow)\nparams.push('scope=' + encodeURIComponent('accounts:read,transactions:read,credentials:read'));\n\n// 3. Market & Locale\nparams.push('market=' + encodeURIComponent(market));\nparams.push('locale=' + encodeURIComponent(locale));\n\n// 4. State\nparams.push('state=' + encodeURIComponent(JSON.stringify(stateObj)));\n\n// 5. FORCE TEST MODE (Creates user in Sandbox)\nparams.push('test=true');\n\nconst tinkLinkUrl = 'https://link.tink.com/1.0/transactions/connect-accounts?' + params.join('&');\n\nreturn [{\n  json: {\n    success: true,\n    tinkLinkUrl: tinkLinkUrl,\n    market: market\n  }\n}];"
+      },
+      "name": "Build Tink Link URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [280, 0],
+      "id": "build-tink-link",
+      "notes": "Generates Link with test=true and NO auth code"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [500, 0],
+      "id": "respond-webhook"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "tink/callback",
+        "options": {}
+      },
+      "name": "Webhook - Tink Callback",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [0, 300],
+      "id": "webhook-callback",
+      "webhookId": "tink-callback",
+      "notes": "Callback from Tink after bank login"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.tink.com/api/v1/oauth/token",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "client_id",
+              "value": "45c7abdaa6a147768f78db1de03944a0"
+            },
+            {
+              "name": "client_secret",
+              "value": "bbdb2e0d1e904d8ba8397efb5f1e8a91"
+            },
+            {
+              "name": "grant_type",
+              "value": "authorization_code"
+            },
+            {
+              "name": "code",
+              "value": "={{ $json.body.code }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "name": "Exchange Code for Token",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [220, 300],
+      "id": "exchange-code",
+      "notes": "Exchanges code for User Access Token"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.tink.com/data/v2/accounts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.access_token }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "name": "Fetch User Accounts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [440, 300],
+      "id": "fetch-accounts"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Transform Tink accounts to Invunion format\nconst callbackData = $('Webhook - Tink Callback').item.json.body;\nconst tokenData = $('Exchange Code for Token').item.json;\nconst accountsResponse = items[0].json;\n\n// Parse state\nlet stateData = {};\ntry {\n  stateData = JSON.parse(callbackData.state || '{}');\n} catch (e) {\n  stateData = { tenantId: callbackData.state };\n}\n\nconst accounts = (accountsResponse.accounts || []).map(acc => ({\n  providerAccountId: acc.id,\n  name: acc.name,\n  iban: acc.identifiers?.iban?.iban || null,\n  bic: acc.identifiers?.iban?.bic || null,\n  currency: acc.balances?.booked?.amount?.currencyCode || 'EUR',\n  accountType: acc.type,\n  balance: acc.balances?.booked?.amount?.value?.unscaledValue / Math.pow(10, acc.balances?.booked?.amount?.value?.scale || 2),\n  bankName: acc.financialInstitutionId,\n  rawData: acc\n}));\n\nreturn [{\n  json: {\n    tenantId: stateData.tenantId,\n    connectionId: stateData.connectionId,\n    credentialsId: callbackData.credentialsId,\n    accessToken: tokenData.access_token,\n    refreshToken: tokenData.refresh_token,\n    expiresIn: tokenData.expires_in,\n    accounts: accounts,\n    accountCount: accounts.length\n  }\n}];"
+      },
+      "name": "Transform Accounts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 300],
+      "id": "transform-accounts"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.invunion.com/api/v1/banking/tink/complete-connection",
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "tenantId",
+              "value": "={{ $json.tenantId }}"
+            },
+            {
+              "name": "connectionId",
+              "value": "={{ $json.connectionId }}"
+            },
+            {
+              "name": "credentialsId",
+              "value": "={{ $json.credentialsId }}"
+            },
+            {
+              "name": "accessToken",
+              "value": "={{ $json.accessToken }}"
+            },
+            {
+              "name": "refreshToken",
+              "value": "={{ $json.refreshToken }}"
+            },
+            {
+              "name": "expiresIn",
+              "value": "={{ $json.expiresIn }}"
+            },
+            {
+              "name": "accounts",
+              "value": "={{ $json.accounts }}"
+            },
+            {
+              "name": "accountCount",
+              "value": "={{ $json.accountCount }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "name": "Save to Backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [880, 300],
+      "id": "save-to-backend"
+    },
+    {
+      "parameters": {
+        "respondWith": "redirect",
+        "redirectURL": "=https://app.invunion.com/onboarding?status=success&accounts={{ $json.accountCount }}",
+        "options": {}
+      },
+      "name": "Redirect to Frontend",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1100, 300],
+      "id": "redirect-frontend"
+    }
+  ],
+  "connections": {
+    "Webhook - Init Connection": {
+      "main": [
+        [
+          {
+            "node": "Build Tink Link URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Tink Link URL": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook - Tink Callback": {
+      "main": [
+        [
+          {
+            "node": "Exchange Code for Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Exchange Code for Token": {
+      "main": [
+        [
+          {
+            "node": "Fetch User Accounts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch User Accounts": {
+      "main": [
+        [
+          {
+            "node": "Transform Accounts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transform Accounts": {
+      "main": [
+        [
+          {
+            "node": "Save to Backend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save to Backend": {
+      "main": [
+        [
+          {
+            "node": "Redirect to Frontend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

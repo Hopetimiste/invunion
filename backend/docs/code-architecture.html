@@ -1,0 +1,1246 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Union API - Architecture du Code v2</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-card: #1a1a24;
+            --bg-hover: #252530;
+            --accent-blue: #3b82f6;
+            --accent-green: #10b981;
+            --accent-purple: #8b5cf6;
+            --accent-orange: #f59e0b;
+            --accent-red: #ef4444;
+            --accent-cyan: #06b6d4;
+            --accent-pink: #ec4899;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --border-color: #2d2d3a;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            text-align: center;
+            padding: 3rem 0;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 3rem;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+
+        .version-badge {
+            display: inline-block;
+            background: var(--accent-green);
+            color: #000;
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-top: 1rem;
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            margin: 2rem 0 1rem;
+            color: var(--accent-blue);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        h2::before {
+            content: '';
+            display: inline-block;
+            width: 4px;
+            height: 1.5rem;
+            background: linear-gradient(to bottom, var(--accent-blue), var(--accent-purple));
+            border-radius: 2px;
+        }
+
+        h3 {
+            font-size: 1.2rem;
+            margin: 1.5rem 0 0.75rem;
+            color: var(--text-primary);
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+        }
+
+        .diagram-container {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 1.5rem 0;
+            overflow-x: auto;
+        }
+
+        .mermaid {
+            display: flex;
+            justify-content: center;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin: 1.5rem 0;
+        }
+
+        .feature-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .feature-card:hover {
+            border-color: var(--accent-blue);
+            transform: translateY(-2px);
+        }
+
+        .feature-card h4 {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+            font-size: 1.1rem;
+        }
+
+        .feature-card p {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .icon {
+            font-size: 1.5rem;
+        }
+
+        .file-tree {
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 0.85rem;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 1.5rem;
+            overflow-x: auto;
+        }
+
+        .file-tree .folder {
+            color: var(--accent-blue);
+        }
+
+        .file-tree .file {
+            color: var(--text-secondary);
+        }
+
+        .file-tree .important {
+            color: var(--accent-green);
+        }
+
+        .file-tree .config {
+            color: var(--accent-orange);
+        }
+
+        .file-tree .new {
+            color: var(--accent-pink);
+        }
+
+        .endpoint-list {
+            display: grid;
+            gap: 0.5rem;
+        }
+
+        .endpoint {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.75rem 1rem;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+        }
+
+        .method {
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 0.75rem;
+            min-width: 60px;
+            text-align: center;
+        }
+
+        .method.get { background: var(--accent-green); color: #000; }
+        .method.post { background: var(--accent-blue); color: #fff; }
+        .method.put { background: var(--accent-orange); color: #000; }
+        .method.delete { background: var(--accent-red); color: #fff; }
+
+        .path {
+            color: var(--text-primary);
+        }
+
+        .desc {
+            color: var(--text-muted);
+            margin-left: auto;
+            font-size: 0.8rem;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .badge.todo { background: var(--accent-orange); color: #000; }
+        .badge.done { background: var(--accent-green); color: #000; }
+        .badge.wip { background: var(--accent-blue); color: #fff; }
+        .badge.new { background: var(--accent-pink); color: #fff; }
+
+        .steps {
+            counter-reset: step;
+        }
+
+        .step {
+            display: flex;
+            gap: 1.5rem;
+            padding: 1.5rem 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .step:last-child {
+            border-bottom: none;
+        }
+
+        .step-number {
+            counter-increment: step;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+            border-radius: 50%;
+            font-size: 1.25rem;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .step-number::before {
+            content: counter(step);
+        }
+
+        .step-content h4 {
+            font-size: 1.1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .step-content p {
+            color: var(--text-secondary);
+            margin-bottom: 0.75rem;
+        }
+
+        .step-content ul {
+            list-style: none;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .step-content li {
+            background: var(--bg-secondary);
+            padding: 0.25rem 0.75rem;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        code {
+            background: var(--bg-secondary);
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--accent-cyan);
+        }
+
+        .tab-container {
+            margin: 1.5rem 0;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .tab {
+            padding: 0.75rem 1.5rem;
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            border-radius: 8px 8px 0 0;
+            transition: all 0.2s;
+        }
+
+        .tab:hover {
+            color: var(--text-primary);
+            background: var(--bg-hover);
+        }
+
+        .tab.active {
+            color: var(--accent-blue);
+            background: var(--bg-card);
+            border-bottom: 2px solid var(--accent-blue);
+        }
+
+        .tab-content {
+            display: none;
+            padding: 1.5rem 0;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .flow-section {
+            margin: 2rem 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+
+        th, td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+            font-weight: 500;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+        }
+
+        td {
+            font-size: 0.9rem;
+        }
+
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .status-dot.active { background: var(--accent-green); }
+        .status-dot.pending { background: var(--accent-orange); }
+        .status-dot.inactive { background: var(--text-muted); }
+
+        .field-table {
+            font-size: 0.85rem;
+        }
+
+        .field-table td:first-child {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--accent-cyan);
+        }
+
+        .field-table td:nth-child(2) {
+            color: var(--accent-purple);
+        }
+
+        .recovery-bar {
+            width: 100%;
+            height: 8px;
+            background: var(--bg-secondary);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .recovery-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-green), var(--accent-blue));
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏗️ Union API - Architecture du Code</h1>
+            <p class="subtitle">Comprendre la structure et le flux de données de l'application</p>
+            <span class="version-badge">v2.0.0 - Janvier 2026</span>
+        </header>
+
+        <!-- SECTION 1: VUE D'ENSEMBLE -->
+        <section>
+            <h2>1. Vue d'ensemble du système</h2>
+            
+            <div class="diagram-container">
+                <div class="mermaid">
+flowchart TB
+    subgraph Frontend["🖥️ Frontend (Lovable)"]
+        UI[React App<br/>lovable.dev]
+    end
+    
+    subgraph CloudRun["☁️ Google Cloud Run"]
+        API[Core API<br/>Express.js + TypeScript]
+    end
+    
+    subgraph N8N["🔄 N8N Cloud"]
+        WF1[Banking Sync<br/>GoCardless/Tink]
+        WF2[Invoice Sync<br/>Providers]
+        WF3[Matching<br/>Workflows]
+    end
+    
+    subgraph PubSub["📨 Pub/Sub"]
+        TopicIngest[Topic: ingest]
+        TopicMatching[Topic: matching]
+        TopicAlerts[Topic: alerts]
+    end
+    
+    subgraph Database["🗄️ Cloud SQL"]
+        PG[(PostgreSQL)]
+    end
+    
+    subgraph External["🌐 External"]
+        Firebase[Firebase Auth]
+        Banking[Banking APIs<br/>GoCardless/Tink]
+    end
+    
+    UI -->|REST API| API
+    API -->|Auth| Firebase
+    API -->|SQL| PG
+    API -->|Publish| TopicIngest
+    API -->|Publish| TopicAlerts
+    
+    WF1 -->|Fetch| Banking
+    WF1 -->|POST /banking/ingest| API
+    WF2 -->|POST /ingest| API
+    WF3 -->|Matching logic| PG
+    
+    TopicIngest -.-> WF3
+    TopicMatching -.-> WF3
+    
+    Banking -->|OAuth| UI
+    
+    style API fill:#3b82f6,color:#fff
+    style PG fill:#10b981,color:#fff
+    style N8N fill:#8b5cf6,color:#fff
+    style UI fill:#ec4899,color:#fff
+                </div>
+            </div>
+
+            <div class="grid">
+                <div class="feature-card">
+                    <h4><span class="icon">🔐</span> Authentication</h4>
+                    <p>Firebase Auth gère l'authentification. Les tokens JWT sont vérifiés par le middleware <code>requireAuth</code>. Les custom claims contiennent <code>tenantId</code> et <code>role</code>.</p>
+                </div>
+                <div class="feature-card">
+                    <h4><span class="icon">🏢</span> Multi-tenant</h4>
+                    <p>Chaque requête est isolée par <code>tenant_id</code>. Les utilisateurs ne peuvent accéder qu'aux données de leur entreprise.</p>
+                </div>
+                <div class="feature-card">
+                    <h4><span class="icon">🔄</span> N8N Orchestration</h4>
+                    <p>N8N gère la synchronisation bancaire, l'import de factures et le matching automatique. Simplifie les intégrations externes.</p>
+                </div>
+                <div class="feature-card">
+                    <h4><span class="icon">📊</span> Recovery Tracking</h4>
+                    <p>Chaque facture a un <code>recovery_percent</code> (0-100%) calculé automatiquement selon les transactions matchées.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 2: MODÈLE DE DONNÉES -->
+        <section>
+            <h2>2. Modèle de données (mise à jour v2)</h2>
+            
+            <div class="diagram-container">
+                <div class="mermaid">
+erDiagram
+    tenants ||--o{ users : has
+    tenants ||--o{ suppliers : has
+    tenants ||--o{ bank_connections : has
+    tenants ||--o{ transactions : has
+    tenants ||--o{ invoices : has
+    tenants ||--o{ matches : has
+    
+    suppliers ||--o{ transactions : from
+    suppliers ||--o{ invoices : from
+    
+    bank_connections ||--o{ bank_accounts : has
+    bank_accounts ||--o{ transactions : from
+    
+    transactions ||--o{ matches : matched_to
+    invoices ||--o{ matches : matched_to
+    
+    tenants {
+        uuid id PK
+        string name
+        enum plan
+        jsonb metadata
+    }
+    
+    suppliers {
+        uuid id PK
+        uuid tenant_id FK
+        string name
+        string email
+        string iban
+        jsonb metadata
+    }
+    
+    transactions {
+        uuid id PK
+        uuid tenant_id FK
+        uuid account_id FK
+        uuid supplier_id FK
+        decimal amount
+        string currency
+        date transaction_date
+        timestamp added_at
+        string payment_method
+        string payment_context
+        string external_reference
+        text description_original
+        text description_display
+        enum status
+        jsonb metadata
+    }
+    
+    invoices {
+        uuid id PK
+        uuid tenant_id FK
+        uuid supplier_id FK
+        string invoice_number
+        string external_reference
+        date invoice_date
+        date due_date
+        date payment_expected_date
+        decimal amount_excl_vat
+        decimal vat_amount
+        decimal amount_incl_vat
+        string currency
+        string payment_method
+        string recipient_name
+        string email_contact
+        string phone_contact
+        decimal recovery_percent
+        enum status
+        jsonb metadata
+    }
+    
+    matches {
+        uuid id PK
+        uuid transaction_id FK
+        uuid invoice_id FK
+        decimal matched_amount
+        enum match_type
+        decimal confidence_score
+        jsonb metadata
+    }
+                </div>
+            </div>
+
+            <h3>📋 Champs de la table <code>transactions</code></h3>
+            <table class="field-table">
+                <thead>
+                    <tr>
+                        <th>Champ</th>
+                        <th>Type</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>amount</td>
+                        <td>DECIMAL(15,2)</td>
+                        <td>Montant de la transaction</td>
+                    </tr>
+                    <tr>
+                        <td>currency</td>
+                        <td>VARCHAR(3)</td>
+                        <td>Devise (EUR, USD, etc.)</td>
+                    </tr>
+                    <tr>
+                        <td>transaction_date</td>
+                        <td>DATE</td>
+                        <td>Date de la transaction bancaire</td>
+                    </tr>
+                    <tr>
+                        <td>added_at</td>
+                        <td>TIMESTAMP</td>
+                        <td><span class="badge new">NEW</span> Date d'ajout dans l'application</td>
+                    </tr>
+                    <tr>
+                        <td>payment_method</td>
+                        <td>VARCHAR(50)</td>
+                        <td><span class="badge new">NEW</span> Mode de paiement (card, transfer, direct_debit, cash, check)</td>
+                    </tr>
+                    <tr>
+                        <td>payment_context</td>
+                        <td>VARCHAR(50)</td>
+                        <td><span class="badge new">NEW</span> Contexte (CIT, MIT, recurring, one_time)</td>
+                    </tr>
+                    <tr>
+                        <td>external_reference</td>
+                        <td>VARCHAR(255)</td>
+                        <td><span class="badge new">NEW</span> Référence externe (sales order number, etc.)</td>
+                    </tr>
+                    <tr>
+                        <td>description_original</td>
+                        <td>TEXT</td>
+                        <td><span class="badge new">NEW</span> Description originale de la banque</td>
+                    </tr>
+                    <tr>
+                        <td>description_display</td>
+                        <td>TEXT</td>
+                        <td><span class="badge new">NEW</span> Description affichée (modifiable par l'utilisateur)</td>
+                    </tr>
+                    <tr>
+                        <td>supplier_id</td>
+                        <td>UUID FK</td>
+                        <td><span class="badge new">NEW</span> ID du fournisseur associé</td>
+                    </tr>
+                    <tr>
+                        <td>status</td>
+                        <td>ENUM</td>
+                        <td><span class="badge new">NEW</span> unconsidered | unmatched | matched | ignored | pending</td>
+                    </tr>
+                    <tr>
+                        <td>metadata</td>
+                        <td>JSONB</td>
+                        <td><span class="badge new">NEW</span> Données externes additionnelles (clé-valeur)</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>📄 Champs de la table <code>invoices</code></h3>
+            <table class="field-table">
+                <thead>
+                    <tr>
+                        <th>Champ</th>
+                        <th>Type</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>amount_excl_vat</td>
+                        <td>DECIMAL(15,2)</td>
+                        <td><span class="badge new">RENAMED</span> Montant HT (ex: amount)</td>
+                    </tr>
+                    <tr>
+                        <td>amount_incl_vat</td>
+                        <td>DECIMAL(15,2)</td>
+                        <td><span class="badge new">NEW</span> Montant TTC</td>
+                    </tr>
+                    <tr>
+                        <td>vat_amount</td>
+                        <td>DECIMAL(15,2)</td>
+                        <td>Montant de la TVA</td>
+                    </tr>
+                    <tr>
+                        <td>invoice_date</td>
+                        <td>DATE</td>
+                        <td><span class="badge new">NEW</span> Date de facturation</td>
+                    </tr>
+                    <tr>
+                        <td>payment_expected_date</td>
+                        <td>DATE</td>
+                        <td><span class="badge new">NEW</span> Date de paiement prévue</td>
+                    </tr>
+                    <tr>
+                        <td>payment_method</td>
+                        <td>VARCHAR(50)</td>
+                        <td><span class="badge new">NEW</span> Mode de paiement attendu</td>
+                    </tr>
+                    <tr>
+                        <td>external_reference</td>
+                        <td>VARCHAR(255)</td>
+                        <td><span class="badge new">NEW</span> Référence externe (PO number)</td>
+                    </tr>
+                    <tr>
+                        <td>email_contact</td>
+                        <td>VARCHAR(255)</td>
+                        <td><span class="badge new">NEW</span> Email de contact</td>
+                    </tr>
+                    <tr>
+                        <td>phone_contact</td>
+                        <td>VARCHAR(50)</td>
+                        <td><span class="badge new">NEW</span> Téléphone de contact</td>
+                    </tr>
+                    <tr>
+                        <td>currency</td>
+                        <td>VARCHAR(3)</td>
+                        <td><span class="badge new">NEW</span> Devise</td>
+                    </tr>
+                    <tr>
+                        <td>recipient_name</td>
+                        <td>VARCHAR(255)</td>
+                        <td><span class="badge new">NEW</span> Nom du destinataire</td>
+                    </tr>
+                    <tr>
+                        <td>recovery_percent</td>
+                        <td>DECIMAL(5,2)</td>
+                        <td><span class="badge new">NEW</span> % de recouvrement (0-100)</td>
+                    </tr>
+                    <tr>
+                        <td>status</td>
+                        <td>ENUM</td>
+                        <td><span class="badge new">CHANGED</span> unpaid | partial | paid | cancelled | overdue</td>
+                    </tr>
+                    <tr>
+                        <td>metadata</td>
+                        <td>JSONB</td>
+                        <td><span class="badge new">NEW</span> Données externes additionnelles</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>📊 Barre de recouvrement (Recovery)</h3>
+            <div class="card">
+                <p style="margin-bottom: 1rem;">Le <code>recovery_percent</code> est calculé automatiquement par un trigger PostgreSQL :</p>
+                <pre class="file-tree">
+recovery_percent = (SUM(matched_amount) / amount_incl_vat) * 100
+
+<span class="config">Status automatique:</span>
+- 0%      → <span class="file">unpaid</span>
+- 1-99%   → <span class="important">partial</span>
+- 100%    → <span class="important">paid</span>
+                </pre>
+                <p style="margin-top: 1rem;">Exemple de barre de recouvrement (65%) :</p>
+                <div class="recovery-bar" style="margin-top: 0.5rem;">
+                    <div class="recovery-bar-fill" style="width: 65%;"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 3: FLUX DE DONNÉES -->
+        <section>
+            <h2>3. Flux de données principaux</h2>
+
+            <div class="tab-container">
+                <div class="tabs">
+                    <button class="tab active" onclick="showTab('flow-auth')">🔐 Auth</button>
+                    <button class="tab" onclick="showTab('flow-banking')">🏦 Banking</button>
+                    <button class="tab" onclick="showTab('flow-matching')">🔄 Matching</button>
+                    <button class="tab" onclick="showTab('flow-recovery')">📊 Recovery</button>
+                </div>
+
+                <div id="flow-auth" class="tab-content active">
+                    <h3>Flux d'authentification et création de compte</h3>
+                    <div class="diagram-container">
+                        <div class="mermaid">
+sequenceDiagram
+    participant U as 👤 User
+    participant F as 🖥️ Lovable
+    participant FB as 🔥 Firebase
+    participant API as ☁️ API
+    participant DB as 🗄️ PostgreSQL
+    
+    U->>F: Signup (email/password)
+    F->>FB: createUserWithEmailAndPassword()
+    FB-->>F: Firebase User (uid)
+    F->>FB: getIdToken()
+    FB-->>F: JWT Token
+    
+    Note over F,API: Token contient uid, email
+    
+    F->>API: POST /auth/signup-tenant<br/>{companyName}
+    API->>API: verifyIdToken(JWT)
+    API->>DB: INSERT tenant (+ metadata)
+    API->>DB: INSERT user (firebase_uid)
+    API->>FB: setCustomUserClaims<br/>{tenantId, role: 'admin'}
+    API-->>F: {tenantId, userId}
+    
+    Note over F: User doit re-login pour<br/>avoir les nouveaux claims
+    
+    F->>FB: signOut() + signIn()
+    FB-->>F: New JWT avec claims
+    F->>API: GET /auth/me
+    API-->>F: {uid, email, tenantId, role}
+                        </div>
+                    </div>
+                </div>
+
+                <div id="flow-banking" class="tab-content">
+                    <h3>Flux de synchronisation bancaire via N8N</h3>
+                    <div class="diagram-container">
+                        <div class="mermaid">
+sequenceDiagram
+    participant N8N as 🔄 N8N
+    participant GC as 🏦 GoCardless
+    participant API as ☁️ API
+    participant DB as 🗄️ PostgreSQL
+    
+    Note over N8N: CRON: toutes les 6h
+    
+    N8N->>API: GET /banking/accounts-to-sync
+    API->>DB: SELECT active accounts
+    API-->>N8N: [{accountId, gcAccountId, lastSyncDate}]
+    
+    loop Pour chaque compte
+        N8N->>GC: GET /accounts/{id}/transactions
+        GC-->>N8N: [{transactions}]
+        
+        N8N->>N8N: Normalize data
+        
+        N8N->>API: POST /banking/ingest/transactions
+        Note over API: {tenantId, accountId,<br/>transactions[], syncedAt}
+        
+        API->>DB: INSERT transactions<br/>ON CONFLICT DO NOTHING
+        API->>DB: UPDATE account last_sync_at
+        API-->>N8N: {inserted: 15, skipped: 3}
+    end
+    
+    Note over N8N: Trigger matching workflow
+                        </div>
+                    </div>
+                </div>
+
+                <div id="flow-matching" class="tab-content">
+                    <h3>Flux de matching transaction ↔ facture</h3>
+                    <div class="diagram-container">
+                        <div class="mermaid">
+sequenceDiagram
+    participant U as 👤 User
+    participant F as 🖥️ Lovable
+    participant API as ☁️ API
+    participant N8N as 🔄 N8N
+    participant DB as 🗄️ PostgreSQL
+    
+    Note over N8N: Matching automatique (N8N)
+    
+    N8N->>DB: Get unmatched transactions
+    N8N->>DB: Get unpaid invoices
+    N8N->>N8N: Compare amount, date,<br/>external_reference
+    
+    loop Pour chaque match trouvé
+        N8N->>API: POST /matches<br/>{transactionId, invoiceId, matchedAmount}
+        API->>DB: INSERT match
+        API->>DB: UPDATE transaction status
+        Note over DB: Trigger: update_invoice_recovery()
+        API-->>N8N: {matchId}
+    end
+    
+    Note over U,F: Matching manuel
+    
+    U->>F: Select transaction + invoice
+    F->>API: POST /matches/manual<br/>{transactionId, invoiceId, matchedAmount}
+    API->>DB: INSERT match
+    Note over DB: Trigger auto-calcule<br/>recovery_percent
+    API-->>F: {matchId, invoice.recovery_percent}
+                        </div>
+                    </div>
+                </div>
+
+                <div id="flow-recovery" class="tab-content">
+                    <h3>Flux de calcul du recouvrement</h3>
+                    <div class="diagram-container">
+                        <div class="mermaid">
+sequenceDiagram
+    participant API as ☁️ API
+    participant DB as 🗄️ PostgreSQL
+    participant TRG as 🔧 Trigger
+    
+    Note over API: Création d'un match
+    
+    API->>DB: INSERT INTO matches<br/>(transaction_id, invoice_id, matched_amount)
+    
+    DB->>TRG: AFTER INSERT trigger
+    
+    TRG->>DB: SELECT SUM(matched_amount)<br/>FROM matches WHERE invoice_id = ?
+    DB-->>TRG: total_matched = 750€
+    
+    TRG->>DB: SELECT amount_incl_vat<br/>FROM invoices WHERE id = ?
+    DB-->>TRG: amount_incl_vat = 1000€
+    
+    TRG->>TRG: recovery_percent = (750/1000) * 100 = 75%
+    
+    TRG->>DB: UPDATE invoices SET<br/>recovery_percent = 75,<br/>status = 'partial'
+    
+    Note over DB: Facture: 75% recouvrée<br/>Status: partial
+    
+    DB-->>API: Match created
+    API-->>API: Return updated invoice
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 4: STRUCTURE DU CODE -->
+        <section>
+            <h2>4. Structure du Code Backend</h2>
+            
+            <div class="card">
+                <pre class="file-tree">
+<span class="folder">backend/</span>
+├── <span class="folder">src/</span>
+│   ├── <span class="important">index.ts</span>              <span class="config">← Point d'entrée Express</span>
+│   │
+│   ├── <span class="folder">config/</span>               <span class="config">← Configuration centralisée</span>
+│   │   ├── <span class="config">index.ts</span>          <span class="file">Variables d'env, providers banking</span>
+│   │   ├── <span class="file">database.ts</span>        <span class="file">Pool PostgreSQL</span>
+│   │   ├── <span class="file">pubsub.ts</span>          <span class="file">Client Pub/Sub</span>
+│   │   └── <span class="file">secrets.ts</span>         <span class="file">Secret Manager</span>
+│   │
+│   ├── <span class="folder">middleware/</span>           <span class="config">← Middlewares Express</span>
+│   │   ├── <span class="important">auth.ts</span>            <span class="file">requireAuth, requireAdmin</span>
+│   │   ├── <span class="file">errorHandler.ts</span>    <span class="file">Gestion erreurs globale</span>
+│   │   └── <span class="file">validate.ts</span>        <span class="file">Validation Zod</span>
+│   │
+│   ├── <span class="folder">routes/v1/</span>            <span class="config">← Routes API REST</span>
+│   │   ├── <span class="file">index.ts</span>           <span class="file">Router principal</span>
+│   │   ├── <span class="file">auth.ts</span>            <span class="file">/auth/me, /auth/signup-tenant</span>
+│   │   ├── <span class="file">transactions.ts</span>    <span class="file">CRUD transactions</span>
+│   │   ├── <span class="file">invoices.ts</span>        <span class="file">CRUD factures</span>
+│   │   ├── <span class="file">matches.ts</span>         <span class="file">Matching manuel/auto</span>
+│   │   ├── <span class="file">alerts.ts</span>          <span class="file">Notifications</span>
+│   │   ├── <span class="file">connections.ts</span>     <span class="file">Connexions bancaires</span>
+│   │   ├── <span class="file">banking.ts</span>         <span class="file">Endpoints pour N8N</span>
+│   │   ├── <span class="file">ingest.ts</span>          <span class="file">Upload CSV, webhooks</span>
+│   │   ├── <span class="file">reports.ts</span>         <span class="file">Rapports</span>
+│   │   └── <span class="file">admin.ts</span>           <span class="file">Administration</span>
+│   │
+│   ├── <span class="folder">services/</span>             <span class="config">← Logique métier</span>
+│   │   └── <span class="folder">banking/</span>
+│   │       └── <span class="important">index.ts</span>       <span class="file">Abstraction multi-provider</span>
+│   │
+│   └── <span class="folder">types/</span>                <span class="config">← Types TypeScript</span>
+│       └── <span class="new">index.ts</span>           <span class="file">Interfaces v2 (updated)</span>
+│
+├── <span class="folder">schemas/</span>                  <span class="config">← SQL PostgreSQL</span>
+│   └── <span class="new">001_initial_schema.sql</span> <span class="file">Schema v2 (updated)</span>
+│
+├── <span class="folder">workflows/</span>                <span class="config">← Workflows N8N</span>
+│   ├── <span class="file">n8n-gocardless-simple.json</span>
+│   └── <span class="file">n8n-gocardless-sync.json</span>
+│
+└── <span class="config">Dockerfile</span>                <span class="file">Build multi-stage</span>
+                </pre>
+            </div>
+        </section>
+
+        <!-- SECTION 5: ENDPOINTS API -->
+        <section>
+            <h2>5. Endpoints API principaux</h2>
+            
+            <h3>💳 Transactions</h3>
+            <div class="endpoint-list">
+                <div class="endpoint">
+                    <span class="method get">GET</span>
+                    <span class="path">/api/v1/transactions</span>
+                    <span class="desc">Liste avec filtres (status, supplier_id, payment_method)</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method post">POST</span>
+                    <span class="path">/api/v1/transactions</span>
+                    <span class="desc">Créer (avec external_reference, payment_context)</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method put">PUT</span>
+                    <span class="path">/api/v1/transactions/:id</span>
+                    <span class="desc">Modifier description_display, status, metadata</span>
+                </div>
+            </div>
+
+            <h3>📄 Invoices</h3>
+            <div class="endpoint-list">
+                <div class="endpoint">
+                    <span class="method get">GET</span>
+                    <span class="path">/api/v1/invoices</span>
+                    <span class="desc">Liste avec recovery_percent, filtres status</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method post">POST</span>
+                    <span class="path">/api/v1/invoices</span>
+                    <span class="desc">Créer (amount_excl_vat, amount_incl_vat)</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method get">GET</span>
+                    <span class="path">/api/v1/invoices/:id/recovery</span>
+                    <span class="desc">Détail du recouvrement avec matches</span>
+                </div>
+            </div>
+
+            <h3>🔗 Matches</h3>
+            <div class="endpoint-list">
+                <div class="endpoint">
+                    <span class="method post">POST</span>
+                    <span class="path">/api/v1/matches/manual</span>
+                    <span class="desc">Match manuel avec matched_amount</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method delete">DELETE</span>
+                    <span class="path">/api/v1/matches/:id</span>
+                    <span class="desc">Annuler (recalcule recovery_percent)</span>
+                </div>
+            </div>
+
+            <h3>🏦 Banking (pour N8N)</h3>
+            <div class="endpoint-list">
+                <div class="endpoint">
+                    <span class="method get">GET</span>
+                    <span class="path">/api/v1/banking/accounts-to-sync</span>
+                    <span class="desc">Liste comptes à synchroniser</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method post">POST</span>
+                    <span class="path">/api/v1/banking/ingest/transactions</span>
+                    <span class="desc">Ingestion batch depuis N8N</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 6: ÉTAPES POUR COMMENCER -->
+        <section>
+            <h2>6. 🚀 Grandes étapes pour construire</h2>
+            
+            <div class="card steps">
+                <div class="step">
+                    <div class="step-number"></div>
+                    <div class="step-content">
+                        <h4>Infrastructure GCP</h4>
+                        <p>Créer les ressources Google Cloud nécessaires</p>
+                        <ul>
+                            <li>Cloud SQL (PostgreSQL)</li>
+                            <li>Cloud Run (API)</li>
+                            <li>Pub/Sub (3 topics)</li>
+                            <li>Secret Manager</li>
+                            <li>Firebase (Auth)</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number"></div>
+                    <div class="step-content">
+                        <h4>Base de données</h4>
+                        <p>Exécuter le schéma SQL v2 avec les nouveaux champs</p>
+                        <ul>
+                            <li>Exécuter schemas/001_initial_schema.sql</li>
+                            <li>Vérifier triggers recovery</li>
+                            <li>Créer table suppliers</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number"></div>
+                    <div class="step-content">
+                        <h4>Déploiement API</h4>
+                        <p>Déployer le backend sur Cloud Run</p>
+                        <ul>
+                            <li>Configurer secrets</li>
+                            <li>Deploy Cloud Run</li>
+                            <li>Tester /health</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number"></div>
+                    <div class="step-content">
+                        <h4>N8N Setup</h4>
+                        <p>Configurer N8N Cloud pour les intégrations</p>
+                        <ul>
+                            <li>Créer compte N8N Cloud</li>
+                            <li>Importer workflows</li>
+                            <li>Configurer credentials GoCardless</li>
+                            <li>Activer CRON sync</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number"></div>
+                    <div class="step-content">
+                        <h4>Frontend Lovable</h4>
+                        <p>Connecter le frontend au backend</p>
+                        <ul>
+                            <li>Configurer API_URL</li>
+                            <li>Intégrer Firebase Auth</li>
+                            <li>Créer pages transactions/invoices</li>
+                            <li>Afficher recovery bars</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number"></div>
+                    <div class="step-content">
+                        <h4>Connexion bancaire</h4>
+                        <p>Implémenter le flow GoCardless complet</p>
+                        <ul>
+                            <li>OAuth flow dans Lovable</li>
+                            <li>Callback API</li>
+                            <li>Test sync N8N</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number"></div>
+                    <div class="step-content">
+                        <h4>Matching & Recovery</h4>
+                        <p>Implémenter le matching et le suivi de recouvrement</p>
+                        <ul>
+                            <li>UI matching manuel</li>
+                            <li>N8N auto-matching</li>
+                            <li>Dashboard recovery</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 7: STATUS -->
+        <section>
+            <h2>7. État actuel du code</h2>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>Composant</th>
+                        <th>Status</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Schema PostgreSQL v2</td>
+                        <td><span class="status-indicator"><span class="status-dot active"></span> Prêt</span></td>
+                        <td>Nouveaux champs transactions/invoices, metadata, triggers recovery</td>
+                    </tr>
+                    <tr>
+                        <td>Types TypeScript v2</td>
+                        <td><span class="status-indicator"><span class="status-dot active"></span> Prêt</span></td>
+                        <td>Interfaces mises à jour avec nouveaux champs</td>
+                    </tr>
+                    <tr>
+                        <td>Core API (Express)</td>
+                        <td><span class="status-indicator"><span class="status-dot active"></span> Prêt</span></td>
+                        <td>Structure complète, routes définies</td>
+                    </tr>
+                    <tr>
+                        <td>Routes CRUD</td>
+                        <td><span class="status-indicator"><span class="status-dot pending"></span> À adapter</span></td>
+                        <td>Adapter aux nouveaux champs v2</td>
+                    </tr>
+                    <tr>
+                        <td>N8N Workflows</td>
+                        <td><span class="status-indicator"><span class="status-dot active"></span> Prêt</span></td>
+                        <td>GoCardless sync workflow disponible</td>
+                    </tr>
+                    <tr>
+                        <td>Frontend Lovable</td>
+                        <td><span class="status-indicator"><span class="status-dot pending"></span> À connecter</span></td>
+                        <td>Structure React existante</td>
+                    </tr>
+                    <tr>
+                        <td>Recovery Tracking</td>
+                        <td><span class="status-indicator"><span class="status-dot active"></span> Prêt</span></td>
+                        <td>Trigger PostgreSQL auto-calcul</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+    </div>
+
+    <script>
+        mermaid.initialize({ 
+            startOnLoad: true,
+            theme: 'dark',
+            themeVariables: {
+                primaryColor: '#3b82f6',
+                primaryTextColor: '#f8fafc',
+                primaryBorderColor: '#2d2d3a',
+                lineColor: '#64748b',
+                secondaryColor: '#8b5cf6',
+                tertiaryColor: '#1a1a24',
+                background: '#12121a',
+                mainBkg: '#1a1a24',
+                secondBkg: '#12121a',
+                nodeBorder: '#3b82f6',
+                clusterBkg: '#1a1a24',
+                clusterBorder: '#2d2d3a',
+                titleColor: '#f8fafc',
+                edgeLabelBackground: '#1a1a24',
+            }
+        });
+
+        function showTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            document.getElementById(tabId).classList.add('active');
+            event.target.classList.add('active');
+        }
+    </script>
+</body>
+</html>

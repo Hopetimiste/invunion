@@ -1,0 +1,495 @@
+{
+  "name": "Tink Bank Sync - 4x Daily",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6,12,18,23 * * *"
+            }
+          ]
+        }
+      },
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "id": "schedule-trigger",
+      "notes": "Déclenche 4x/jour : 6h, 12h, 18h, 23h"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.invunion.com/api/v1/banking/accounts-to-sync",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "name": "Get Accounts to Sync",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [450, 300],
+      "id": "get-accounts",
+      "notes": "Récupère la liste des comptes bancaires à synchroniser"
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "name": "Loop Over Accounts",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [650, 300],
+      "id": "loop-accounts",
+      "notes": "Traite chaque compte un par un"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.tink.com/api/v1/oauth/token",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "client_id",
+              "value": "45c7abdaa6a147768f78db1de03944a0"
+            },
+            {
+              "name": "client_secret",
+              "value": "bbdb2e0d1e904d8ba8397efb5f1e8a91"
+            },
+            {
+              "name": "grant_type",
+              "value": "client_credentials"
+            },
+            {
+              "name": "scope",
+              "value": "accounts:read,transactions:read"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "name": "Get Tink Access Token",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [850, 300],
+      "id": "get-tink-token",
+      "notes": "Obtient un token d'accès Tink"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.tink.com/data/v2/accounts/{{ $('Loop Over Accounts').item.json.providerAccountId }}/transactions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.access_token }}"
+            }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "pageSize",
+              "value": "100"
+            },
+            {
+              "name": "bookedDateGte",
+              "value": "={{ $('Loop Over Accounts').item.json.lastSyncDate || new Date(Date.now() - 30*24*60*60*1000).toISOString().split('T')[0] }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "name": "Fetch Transactions from Tink",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1050, 300],
+      "id": "fetch-transactions",
+      "notes": "Récupère les transactions depuis Tink API"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Transform Tink transactions to Invunion format\nconst accountInfo = $('Loop Over Accounts').item.json;\nconst tinkResponse = items[0].json;\nconst accessToken = $('Get Tink Access Token').item.json.access_token;\n\nif (!tinkResponse.transactions || tinkResponse.transactions.length === 0) {\n  return [];\n}\n\nconst transactions = tinkResponse.transactions.map(tx => {\n  // Tink amount is in minor units (cents)\n  const amount = tx.amount.value.unscaledValue / Math.pow(10, tx.amount.value.scale || 2);\n  \n  // Déterminer le type basé sur le montant\n  const isCredit = amount >= 0;\n  \n  return {\n    tenantId: accountInfo.tenantId,\n    accountId: accountInfo.accountId,\n    externalId: tx.id,\n    bookingDate: tx.dates.booked,\n    valueDate: tx.dates.value || tx.dates.booked,\n    amount: Math.abs(amount),\n    currency: tx.amount.currencyCode,\n    direction: isCredit ? 'IN' : 'OUT',\n    counterpartyName: tx.descriptions?.display || tx.descriptions?.original || 'Unknown',\n    counterpartyIban: tx.identifiers?.providerTransactionId || null,\n    description: tx.descriptions?.original || tx.descriptions?.display || '',\n    descriptionOriginal: tx.descriptions?.original || '',\n    descriptionDisplay: tx.descriptions?.display || '',\n    paymentMethod: tx.types?.type || 'unknown',\n    paymentContext: tx.providerMutability || 'unknown',\n    externalReference: tx.reference || tx.identifiers?.providerTransactionId || '',\n    bankTransactionCode: tx.types?.type,\n    categories: tx.categories || [],\n    rawData: tx,\n    syncedAt: new Date().toISOString(),\n    source: 'tink'\n  };\n});\n\nconsole.log(`Processed ${transactions.length} transactions for account ${accountInfo.accountId}`);\n\nreturn transactions.map(tx => ({ json: tx }));"
+      },
+      "name": "Transform Transactions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 300],
+      "id": "transform-transactions",
+      "notes": "Transforme les données Tink vers format Invunion"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.externalId }}",
+              "operation": "exists"
+            }
+          ]
+        }
+      },
+      "name": "Has Transactions?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1450, 300],
+      "id": "has-transactions",
+      "notes": "Vérifie s'il y a des transactions à envoyer"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll"
+      },
+      "name": "Aggregate Transactions",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [1650, 200],
+      "id": "aggregate-transactions",
+      "notes": "Regroupe toutes les transactions en un seul payload"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Group transactions by account\nconst allTransactions = items.map(item => item.json);\n\nif (allTransactions.length === 0) {\n  return [{ json: { message: 'No transactions to send' } }];\n}\n\nconst tenantId = allTransactions[0].tenantId;\nconst accountId = allTransactions[0].accountId;\n\nreturn [{\n  json: {\n    tenantId: tenantId,\n    accountId: accountId,\n    transactions: allTransactions,\n    count: allTransactions.length,\n    syncedAt: new Date().toISOString(),\n    source: 'tink'\n  }\n}];"
+      },
+      "name": "Prepare Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1850, 200],
+      "id": "prepare-payload",
+      "notes": "Prépare le payload final pour le backend"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.invunion.com/api/v1/ingest/transactions",
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "tenantId",
+              "value": "={{ $json.tenantId }}"
+            },
+            {
+              "name": "accountId",
+              "value": "={{ $json.accountId }}"
+            },
+            {
+              "name": "transactions",
+              "value": "={{ $json.transactions }}"
+            },
+            {
+              "name": "count",
+              "value": "={{ $json.count }}"
+            },
+            {
+              "name": "syncedAt",
+              "value": "={{ $json.syncedAt }}"
+            },
+            {
+              "name": "source",
+              "value": "={{ $json.source }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "name": "Send to Backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [2050, 200],
+      "id": "send-to-backend",
+      "notes": "Envoie les transactions au backend Invunion"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.success }}",
+              "operation": "equals",
+              "value2": "true"
+            }
+          ]
+        }
+      },
+      "name": "Success?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [2250, 200],
+      "id": "check-success"
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = items[0].json;\n\nconsole.log('✅ Success:', {\n  inserted: response.inserted,\n  skipped: response.skipped,\n  accountId: response.accountId,\n  source: 'tink'\n});\n\nreturn items;"
+      },
+      "name": "Log Success",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2450, 100],
+      "id": "log-success"
+    },
+    {
+      "parameters": {
+        "jsCode": "const error = items[0].json;\n\nconsole.error('❌ Error sending transactions:', error);\n\nreturn items;"
+      },
+      "name": "Log Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2450, 300],
+      "id": "log-error"
+    },
+    {
+      "parameters": {
+        "jsCode": "console.log('⚠️ No transactions found for this account');\nreturn [];"
+      },
+      "name": "No Transactions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1650, 400],
+      "id": "no-transactions"
+    },
+    {
+      "parameters": {},
+      "name": "Continue Loop",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [2650, 200],
+      "id": "continue-loop",
+      "notes": "Retourne à la boucle pour le compte suivant"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Gestion d'erreur Tink\nconst error = $input.item.json.error || $input.item.json;\n\nconsole.error('❌ Tink API Error:', {\n  accountId: $('Loop Over Accounts').item.json.accountId,\n  error: error\n});\n\nreturn [{\n  json: {\n    accountId: $('Loop Over Accounts').item.json.accountId,\n    error: true,\n    errorMessage: error.errorMessage || error.message || 'Unknown error',\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "name": "Handle Tink Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 500],
+      "id": "handle-tink-error"
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Accounts to Sync",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Accounts to Sync": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Accounts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Accounts": {
+      "main": [
+        [
+          {
+            "node": "Get Tink Access Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Tink Access Token": {
+      "main": [
+        [
+          {
+            "node": "Fetch Transactions from Tink",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Transactions from Tink": {
+      "main": [
+        [
+          {
+            "node": "Transform Transactions",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Tink Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transform Transactions": {
+      "main": [
+        [
+          {
+            "node": "Has Transactions?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Transactions?": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Transactions",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Transactions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Transactions": {
+      "main": [
+        [
+          {
+            "node": "Prepare Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Payload": {
+      "main": [
+        [
+          {
+            "node": "Send to Backend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send to Backend": {
+      "main": [
+        [
+          {
+            "node": "Success?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Success?": {
+      "main": [
+        [
+          {
+            "node": "Log Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Success": {
+      "main": [
+        [
+          {
+            "node": "Continue Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Error": {
+      "main": [
+        [
+          {
+            "node": "Continue Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Continue Loop": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Accounts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Tink Error": {
+      "main": [
+        [
+          {
+            "node": "Continue Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "id": "1",
+      "name": "Banking"
+    },
+    {
+      "id": "2",
+      "name": "Tink"
+    }
+  ],
+  "pinData": {},
+  "versionId": "2"
+}

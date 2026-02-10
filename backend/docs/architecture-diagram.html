@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagramme d'Architecture - Flux de Données</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+    </script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #555;
+            margin-top: 30px;
+        }
+        h3 {
+            color: #666;
+            margin-top: 20px;
+        }
+        .mermaid {
+            background: white;
+            padding: 20px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        .priority-p0 { color: #dc3545; font-weight: bold; }
+        .priority-p1 { color: #fd7e14; font-weight: bold; }
+        .priority-p2 { color: #ffc107; font-weight: bold; }
+        .new-feature {
+            background: #e7f5e7;
+            border-left: 4px solid #28a745;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        .security-note {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+        }
+        th {
+            background: #f8f9fa;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Diagramme d'Architecture - Flux de Données</h1>
+        
+        <h2>Vue d'ensemble du système (Architecture Production-Ready)</h2>
+        <div class="mermaid">
+graph TB
+    %% Styles
+    classDef external fill:#f9f,stroke:#333,stroke-width:2px;
+    classDef edge fill:#ff6b6b,stroke:#333,stroke-width:2px,color:white;
+    classDef ingestion fill:#ffcc00,stroke:#333,stroke-width:2px;
+    classDef storage fill:#3399ff,stroke:#333,stroke-width:2px,color:white;
+    classDef cache fill:#17a2b8,stroke:#333,stroke-width:2px,color:white;
+    classDef process fill:#9933ff,stroke:#333,stroke-width:2px,color:white;
+    classDef userzone fill:#00cc66,stroke:#333,stroke-width:2px,color:white;
+    classDef security fill:#dc3545,stroke:#333,stroke-width:2px,color:white;
+    classDef observability fill:#6c757d,stroke:#333,stroke-width:2px,color:white;
+
+    %% Acteurs Externes
+    subgraph External["🌍 Sources Externes"]
+        Tink[("🏦 Tink\n(Banques)")]:::external
+        ERP[("📊 ERP\n(Factures)")]:::external
+        Webhooks[("📨 Webhooks\n(Providers)")]:::external
+        ExternalClients[("🔌 API Clients\n(CSV/JSON)")]:::external
+    end
+
+    %% ZONE 0 : EDGE LAYER (Protection)
+    subgraph ZoneEdge["🔒 Zone Edge (Protection)"]
+        CloudArmor["🛡️ Cloud Armor\n(WAF)"]:::edge
+        LoadBalancer["⚖️ Cloud Load\nBalancer"]:::edge
+    end
+
+    %% ZONE SÉCURITÉ
+    subgraph ZoneSecurity["🔐 Zone Sécurité"]
+        SecretManager["🔑 Secret Manager\n(Credentials)"]:::security
+        VPC["🏰 VPC Privé\n(Private IPs)"]:::security
+    end
+
+    %% ZONE 1 : INGESTION (Le Bouclier)
+    subgraph ZoneIngestion["🛡️ Zone Ingestion (Async)"]
+        n8n["🐙 n8n\n(Orchestrator)"]:::ingestion
+        CoreWebhook["🔔 Cloud Run\n(Core Webhook)\n+ Idempotency"]:::ingestion
+        PubSubIngest[("📨 Pub/Sub\n(Topic: ingest)")]:::ingestion
+        IngestWorker["⚙️ Cloud Run\n(Ingest Worker)"]:::ingestion
+        DLQIngest[("💀 Dead Letter\n(Topic: ingest-dlq)")]:::ingestion
+    end
+
+    %% ZONE 2 : DATA (Le Coeur)
+    subgraph ZoneData["💾 Zone Données (VPC Privé)"]
+        CloudSQL[("🛢️ Cloud SQL HA\n(PostgreSQL)\n+ PITR Backup")]:::storage
+        ReadReplica[("📖 Read Replica\n(Lectures)")]:::storage
+        Redis[("⚡ Memorystore\n(Redis Cache)")]:::cache
+    end
+
+    %% ZONE 3 : TRAITEMENT (Le Cerveau)
+    subgraph ZoneProcess["🧠 Zone Traitement (Worker)"]
+        ProcessWorker["⚙️ Cloud Run\n(Worker/Jobs)"]:::process
+        IAMatch["🤖 Vertex AI\n(IA Matching)"]:::process
+        PubSubProcess[("📨 Pub/Sub\n(Topic: process)")]:::process
+        DLQProcess[("💀 Dead Letter\n(Topic: process-dlq)")]:::process
+    end
+
+    %% ZONE 4 : UTILISATEUR (La Façade)
+    subgraph ZoneUser["👤 Zone Utilisateur (API-First)"]
+        CoreAPI["🚀 Cloud Run\n(Core API)\nREST/GraphQL\n+ Rate Limiting"]:::userzone
+        Frontend["💻 Frontend\n(React)"]:::userzone
+    end
+
+    %% ZONE OBSERVABILITÉ
+    subgraph ZoneObs["📊 Zone Observabilité"]
+        CloudLogging["📝 Cloud Logging"]:::observability
+        CloudTrace["🔍 Cloud Trace"]:::observability
+        CloudMonitoring["📈 Cloud Monitoring"]:::observability
+        Alerting["🚨 Alerting\n(PagerDuty)"]:::observability
+    end
+
+    %% FLUX EDGE
+    ExternalClients -- "HTTPS" --> CloudArmor
+    Frontend -- "HTTPS" --> CloudArmor
+    CloudArmor -- "Filtré" --> LoadBalancer
+    LoadBalancer -- "Route" --> CoreAPI
+
+    %% FLUX WEBHOOKS (avec Edge)
+    Webhooks -- "Webhook Events" --> CloudArmor
+    CloudArmor -- "Filtré" --> CoreWebhook
+    
+    %% FLUX BANQUES/ERP via n8n
+    Tink -- "JSON Data" --> n8n
+    ERP -- "Factures Data" --> n8n
+    n8n -- "Push Message" --> PubSubIngest
+    
+    %% FLUX Core Webhook
+    CoreWebhook -- "Validate & Push" --> PubSubIngest
+    
+    %% FLUX Ingestion vers Data
+    PubSubIngest -- "Dépile (Batch)" --> IngestWorker
+    PubSubIngest -. "Échecs" .-> DLQIngest
+    IngestWorker -- "INSERT (Bulk)" --> CloudSQL
+    
+    %% FLUX Cache
+    CoreAPI -- "Cache-aside" --> Redis
+    Redis -. "Miss" .-> CloudSQL
+    CoreAPI -- "Read (CQRS)" --> ReadReplica
+
+    %% FLUX Traitement
+    CloudSQL -- "Trigger" --> PubSubProcess
+    PubSubProcess -- "Dépile" --> ProcessWorker
+    PubSubProcess -. "Échecs" .-> DLQProcess
+    ProcessWorker -- "Lit (Unmatched)" --> ReadReplica
+    ProcessWorker -- "Appelle IA" --> IAMatch
+    IAMatch -- "Résultats" --> ProcessWorker
+    ProcessWorker -- "UPDATE" --> CloudSQL
+
+    %% FLUX Secrets
+    CoreAPI -. "Credentials" .-> SecretManager
+    IngestWorker -. "Credentials" .-> SecretManager
+    CoreWebhook -. "Credentials" .-> SecretManager
+
+    %% FLUX Observabilité
+    CoreAPI -. "Logs/Traces" .-> CloudLogging
+    IngestWorker -. "Logs/Traces" .-> CloudLogging
+    ProcessWorker -. "Logs/Traces" .-> CloudLogging
+    CloudLogging --> CloudTrace
+    CloudMonitoring --> Alerting
+
+    %% VPC
+    CloudSQL -.-> VPC
+    ReadReplica -.-> VPC
+    Redis -.-> VPC
+        </div>
+
+        <h2>🆕 Nouvelles Zones Ajoutées</h2>
+
+        <div class="new-feature">
+            <h3>🔒 Zone Edge (Protection) - NOUVEAU</h3>
+            <ul>
+                <li><strong>Cloud Armor (WAF)</strong> : Protection contre les attaques DDoS, injection SQL, XSS</li>
+                <li><strong>Cloud Load Balancer</strong> : Distribution de charge, SSL termination, health checks</li>
+            </ul>
+        </div>
+
+        <div class="new-feature">
+            <h3>🔐 Zone Sécurité - NOUVEAU</h3>
+            <ul>
+                <li><strong>Secret Manager</strong> : Stockage sécurisé des credentials (API keys Tink, tokens, etc.)</li>
+                <li><strong>VPC Privé</strong> : Isolation réseau, Private Service Connect pour Cloud SQL</li>
+            </ul>
+        </div>
+
+        <div class="new-feature">
+            <h3>⚡ Cache Layer (Memorystore) - NOUVEAU</h3>
+            <ul>
+                <li><strong>Redis Cache</strong> : Cache des requêtes fréquentes (dashboard, listes)</li>
+                <li><strong>Pattern Cache-Aside</strong> : CoreAPI interroge Redis d'abord, puis Cloud SQL si miss</li>
+            </ul>
+        </div>
+
+        <div class="new-feature">
+            <h3>📊 Zone Observabilité - NOUVEAU</h3>
+            <ul>
+                <li><strong>Cloud Logging</strong> : Centralisation des logs de tous les services</li>
+                <li><strong>Cloud Trace</strong> : Tracing distribué pour debug des flux asynchrones</li>
+                <li><strong>Cloud Monitoring</strong> : Métriques, dashboards, SLIs/SLOs</li>
+                <li><strong>Alerting</strong> : Intégration PagerDuty/Opsgenie pour incidents</li>
+            </ul>
+        </div>
+
+        <h2>🔄 Améliorations des Zones Existantes</h2>
+
+        <h3>Zone Données - Améliorations</h3>
+        <table>
+            <tr>
+                <th>Composant</th>
+                <th>Avant</th>
+                <th>Après</th>
+                <th>Bénéfice</th>
+            </tr>
+            <tr>
+                <td>Cloud SQL</td>
+                <td>Instance simple</td>
+                <td>Cloud SQL HA + PITR</td>
+                <td>Haute disponibilité, recovery point < 5 min</td>
+            </tr>
+            <tr>
+                <td>Lectures</td>
+                <td>Direct sur master</td>
+                <td>Read Replica dédié</td>
+                <td>CQRS, meilleure performance, isolation</td>
+            </tr>
+            <tr>
+                <td>Cache</td>
+                <td>Aucun</td>
+                <td>Memorystore (Redis)</td>
+                <td>Latence < 1ms sur requêtes fréquentes</td>
+            </tr>
+        </table>
+
+        <h3>Zone Ingestion - Améliorations</h3>
+        <table>
+            <tr>
+                <th>Composant</th>
+                <th>Avant</th>
+                <th>Après</th>
+                <th>Bénéfice</th>
+            </tr>
+            <tr>
+                <td>Pub/Sub Ingest</td>
+                <td>Sans DLQ</td>
+                <td>Avec Dead Letter Queue</td>
+                <td>Pas de perte de messages en cas d'erreur</td>
+            </tr>
+            <tr>
+                <td>Core Webhook</td>
+                <td>Basic</td>
+                <td>+ Idempotency check</td>
+                <td>Évite les doublons si webhook rejoué</td>
+            </tr>
+        </table>
+
+        <h3>Zone Traitement - Améliorations</h3>
+        <table>
+            <tr>
+                <th>Composant</th>
+                <th>Avant</th>
+                <th>Après</th>
+                <th>Bénéfice</th>
+            </tr>
+            <tr>
+                <td>Pub/Sub Process</td>
+                <td>Sans DLQ</td>
+                <td>Avec Dead Letter Queue</td>
+                <td>Retry automatique, analyse des échecs</td>
+            </tr>
+            <tr>
+                <td>Lectures Worker</td>
+                <td>Sur master</td>
+                <td>Sur Read Replica</td>
+                <td>N'impacte pas les écritures</td>
+            </tr>
+        </table>
+
+        <h3>Zone Utilisateur - Améliorations</h3>
+        <table>
+            <tr>
+                <th>Composant</th>
+                <th>Avant</th>
+                <th>Après</th>
+                <th>Bénéfice</th>
+            </tr>
+            <tr>
+                <td>Core API</td>
+                <td>Accès direct</td>
+                <td>Via WAF + Load Balancer + Rate Limiting</td>
+                <td>Protection, quotas par tenant</td>
+            </tr>
+            <tr>
+                <td>Frontend</td>
+                <td>Direct API</td>
+                <td>Via Cloud Armor</td>
+                <td>Protection DDoS</td>
+            </tr>
+        </table>
+
+        <h2>🔐 Sécurité - Détails</h2>
+
+        <div class="security-note">
+            <strong>⚠️ Données bancaires = Conformité obligatoire</strong>
+            <p>RGPD, DSP2, et potentiellement PCI-DSS selon les données manipulées.</p>
+        </div>
+
+        <h3>Chiffrement</h3>
+        <ul>
+            <li><strong>In-Transit</strong> : TLS 1.3 partout (Cloud Run, Load Balancer)</li>
+            <li><strong>At-Rest</strong> : Cloud SQL encryption par défaut + CMEK si nécessaire</li>
+            <li><strong>Secrets</strong> : Secret Manager pour tous les credentials</li>
+        </ul>
+
+        <h3>Isolation Réseau</h3>
+        <ul>
+            <li><strong>VPC Privé</strong> : Cloud SQL, Redis, Read Replica en IPs privées</li>
+            <li><strong>Private Service Connect</strong> : Connexion sécurisée Cloud Run → Cloud SQL</li>
+            <li><strong>Firewall Rules</strong> : Seuls les services autorisés peuvent accéder à la DB</li>
+        </ul>
+
+        <h3>Idempotency Store (Webhooks)</h3>
+        <pre><code>-- Table pour éviter les doublons de webhooks
+CREATE TABLE webhook_events (
+    event_id VARCHAR(255) PRIMARY KEY,
+    provider VARCHAR(50) NOT NULL,
+    received_at TIMESTAMP DEFAULT NOW(),
+    processed BOOLEAN DEFAULT FALSE,
+    payload JSONB
+);
+
+-- Usage: INSERT ... ON CONFLICT DO NOTHING</code></pre>
+
+        <h3>Audit Trail</h3>
+        <pre><code>-- Table d'audit pour traçabilité
+CREATE TABLE audit_log (
+    id BIGSERIAL PRIMARY KEY,
+    tenant_id UUID NOT NULL,
+    user_id UUID,
+    action VARCHAR(50) NOT NULL,
+    resource_type VARCHAR(50) NOT NULL,
+    resource_id VARCHAR(255),
+    old_values JSONB,
+    new_values JSONB,
+    ip_address INET,
+    user_agent TEXT,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_audit_tenant_date ON audit_log(tenant_id, created_at DESC);</code></pre>
+
+        <h2>💀 Dead Letter Queues - Stratégie</h2>
+
+        <h3>Configuration Pub/Sub</h3>
+        <pre><code># Topic principal
+gcloud pubsub topics create ingest
+
+# Dead Letter Topic
+gcloud pubsub topics create ingest-dlq
+
+# Subscription avec DLQ
+gcloud pubsub subscriptions create ingest-sub \
+    --topic=ingest \
+    --dead-letter-topic=ingest-dlq \
+    --max-delivery-attempts=5 \
+    --ack-deadline=60</code></pre>
+
+        <h3>Gestion des DLQ</h3>
+        <ul>
+            <li><strong>Monitoring</strong> : Alerting si messages dans DLQ > seuil</li>
+            <li><strong>Analyse</strong> : Dashboard pour visualiser les erreurs</li>
+            <li><strong>Replay</strong> : Possibilité de rejouer les messages après fix</li>
+        </ul>
+
+        <h2>⚡ Cache Strategy</h2>
+
+        <h3>Pattern Cache-Aside</h3>
+        <pre><code>// Pseudo-code Core API
+async function getTransactions(tenantId, filters) {
+    const cacheKey = `transactions:${tenantId}:${hash(filters)}`;
+    
+    // 1. Check cache
+    let data = await redis.get(cacheKey);
+    if (data) return JSON.parse(data);
+    
+    // 2. Cache miss → Query Read Replica
+    data = await readReplica.query(
+        'SELECT * FROM transactions WHERE tenant_id = $1 ...',
+        [tenantId]
+    );
+    
+    // 3. Store in cache (TTL: 5 minutes)
+    await redis.setex(cacheKey, 300, JSON.stringify(data));
+    
+    return data;
+}
+
+// Invalidation on write
+async function updateTransaction(id, data) {
+    await cloudSQL.update('transactions', id, data);
+    await redis.del(`transactions:${data.tenant_id}:*`); // Pattern delete
+}</code></pre>
+
+        <h3>Données à cacher</h3>
+        <table>
+            <tr>
+                <th>Donnée</th>
+                <th>TTL</th>
+                <th>Stratégie invalidation</th>
+            </tr>
+            <tr>
+                <td>Liste transactions (dashboard)</td>
+                <td>5 min</td>
+                <td>Invalidation sur nouvelle transaction</td>
+            </tr>
+            <tr>
+                <td>Stats réconciliation</td>
+                <td>1 min</td>
+                <td>Invalidation sur nouveau match</td>
+            </tr>
+            <tr>
+                <td>Configuration tenant</td>
+                <td>1 heure</td>
+                <td>Invalidation sur modification</td>
+            </tr>
+            <tr>
+                <td>User session data</td>
+                <td>15 min</td>
+                <td>Sliding expiration</td>
+            </tr>
+        </table>
+
+        <h2>📈 Rate Limiting</h2>
+
+        <h3>Configuration par tenant</h3>
+        <table>
+            <tr>
+                <th>Plan</th>
+                <th>Requests/min</th>
+                <th>Requests/jour</th>
+                <th>Upload max</th>
+            </tr>
+            <tr>
+                <td>Free</td>
+                <td>60</td>
+                <td>1,000</td>
+                <td>1 MB</td>
+            </tr>
+            <tr>
+                <td>Pro</td>
+                <td>300</td>
+                <td>50,000</td>
+                <td>10 MB</td>
+            </tr>
+            <tr>
+                <td>Enterprise</td>
+                <td>1,000</td>
+                <td>Illimité</td>
+                <td>100 MB</td>
+            </tr>
+        </table>
+
+        <h3>Implémentation (Redis)</h3>
+        <pre><code>// Rate limiting avec sliding window
+async function checkRateLimit(tenantId, plan) {
+    const key = `ratelimit:${tenantId}:${currentMinute()}`;
+    const current = await redis.incr(key);
+    
+    if (current === 1) {
+        await redis.expire(key, 60);
+    }
+    
+    const limit = LIMITS[plan].requestsPerMinute;
+    if (current > limit) {
+        throw new RateLimitError(`Rate limit exceeded: ${current}/${limit}`);
+    }
+}</code></pre>
+
+        <h2>📊 Observabilité - Dashboards</h2>
+
+        <h3>Métriques Clés (SLIs)</h3>
+        <ul>
+            <li><strong>Disponibilité API</strong> : % requêtes 2xx (cible: 99.9%)</li>
+            <li><strong>Latence P99</strong> : Temps de réponse (cible: < 500ms)</li>
+            <li><strong>Taux de réconciliation</strong> : % transactions matchées automatiquement</li>
+            <li><strong>Erreurs ingestion</strong> : Messages en DLQ / total</li>
+            <li><strong>Cache hit rate</strong> : % requêtes servies par cache (cible: > 80%)</li>
+        </ul>
+
+        <h3>Alertes Critiques</h3>
+        <table>
+            <tr>
+                <th>Alerte</th>
+                <th>Condition</th>
+                <th>Sévérité</th>
+            </tr>
+            <tr>
+                <td>API Down</td>
+                <td>Error rate > 5% pendant 5 min</td>
+                <td class="priority-p0">P0 - Critical</td>
+            </tr>
+            <tr>
+                <td>Cloud SQL Failover</td>
+                <td>Basculement sur replica</td>
+                <td class="priority-p0">P0 - Critical</td>
+            </tr>
+            <tr>
+                <td>DLQ Growing</td>
+                <td>> 100 messages en DLQ</td>
+                <td class="priority-p1">P1 - High</td>
+            </tr>
+            <tr>
+                <td>High Latency</td>
+                <td>P99 > 2s pendant 10 min</td>
+                <td class="priority-p1">P1 - High</td>
+            </tr>
+            <tr>
+                <td>Cache Down</td>
+                <td>Redis non disponible</td>
+                <td class="priority-p2">P2 - Medium</td>
+            </tr>
+        </table>
+
+        <h2>Micro-services Cloud Run</h2>
+        <ul>
+            <li><strong>Core API</strong> : API principale <strong>API-First</strong> (REST/GraphQL) pour :
+                <ul>
+                    <li>Requêtes utilisateur (CRUD)</li>
+                    <li>Upload de fichiers CSV/JSON</li>
+                    <li>Gestion des emails/alertes</li>
+                    <li>Point d'entrée pour tous les clients (Frontend + API externes)</li>
+                    <li><span class="priority-p1">+ Rate Limiting par tenant</span></li>
+                    <li><span class="priority-p1">+ Cache-aside avec Redis</span></li>
+                </ul>
+            </li>
+            <li><strong>Core Webhook</strong> : Service dédié à la réception et validation des webhooks externes
+                <ul>
+                    <li><span class="priority-p1">+ Idempotency check</span></li>
+                </ul>
+            </li>
+            <li><strong>Ingest Worker</strong> : Service d'ingestion qui écrit les données dans Cloud SQL (toutes sources confondues)</li>
+            <li><strong>Worker/Jobs</strong> : Service de traitement qui orchestre l'IA après ingestion complète (à venir)</li>
+        </ul>
+
+        <h2>Légende des Zones</h2>
+        <ul>
+            <li><strong>🔒 Zone Edge (Protection)</strong> : WAF, Load Balancing, DDoS protection (Cloud Armor)</li>
+            <li><strong>🔐 Zone Sécurité</strong> : Secret Manager, VPC Privé, isolation réseau</li>
+            <li><strong>🛡️ Zone Ingestion (Async)</strong> : Point d'entrée asynchrone avec Dead Letter Queues</li>
+            <li><strong>💾 Zone Données (Master)</strong> : Cloud SQL HA + Read Replica + Redis Cache</li>
+            <li><strong>🧠 Zone Traitement (Worker)</strong> : Traitement asynchrone avec DLQ</li>
+            <li><strong>👤 Zone Utilisateur (API-First)</strong> : API avec rate limiting via Edge</li>
+            <li><strong>📊 Zone Observabilité</strong> : Logging, Tracing, Monitoring, Alerting</li>
+        </ul>
+
+        <h2>Tables principales dans Cloud SQL</h2>
+        <p>Cloud SQL (PostgreSQL) contient plusieurs tables organisées par domaine :</p>
+        
+        <h3>Tables Bancaires</h3>
+        <ul>
+            <li><strong>bank_connections</strong> : Connexions aux providers bancaires (Tink, etc.)</li>
+            <li><strong>bank_accounts</strong> : Comptes bancaires liés aux connexions</li>
+            <li><strong>transactions</strong> : Transactions bancaires (ou <code>transactions_unified</code> selon l'architecture)</li>
+        </ul>
+
+        <h3>Tables Factures/ERP</h3>
+        <ul>
+            <li><strong>invoices</strong> / <strong>factures</strong> : Factures provenant de l'ERP</li>
+            <li><strong>external_data</strong> : Données externes (si architecture multi-sources)</li>
+        </ul>
+
+        <h3>Tables Relations/Matching</h3>
+        <ul>
+            <li><strong>data_relationships</strong> : Relations entre transactions et factures (matching IA)</li>
+            <li><strong>reconciliation_matches</strong> : Résultats de réconciliation</li>
+        </ul>
+
+        <h3>Tables Système</h3>
+        <ul>
+            <li><strong>emails_queue</strong> / <strong>alerts_queue</strong> : Queue d'emails et alertes à envoyer</li>
+            <li><strong>data_ingestion_log</strong> : Logs d'ingestion pour traçabilité</li>
+            <li><strong>import_jobs</strong> : Suivi des imports CSV/JSON (statut, erreurs, etc.)</li>
+            <li><strong>users</strong>, <strong>tenants</strong> : Gestion des utilisateurs et organisations</li>
+            <li><strong class="priority-p1">webhook_events</strong> : Idempotency store pour webhooks (NOUVEAU)</li>
+            <li><strong class="priority-p1">audit_log</strong> : Audit trail pour conformité (NOUVEAU)</li>
+        </ul>
+
+        <h2>Types de Composants</h2>
+        <ul>
+            <li><strong>Sources Externes</strong> (Rose) : Sources de données externes (Tink, ERP, Webhooks providers)</li>
+            <li><strong>Edge</strong> (Rouge) : Protection périmétrique (WAF, Load Balancer)</li>
+            <li><strong>Ingestion</strong> (Jaune) : Services d'ingestion avec DLQ</li>
+            <li><strong>Stockage</strong> (Bleu) : Cloud SQL HA + Read Replica</li>
+            <li><strong>Cache</strong> (Cyan) : Memorystore Redis</li>
+            <li><strong>Traitement</strong> (Violet) : Workers avec DLQ</li>
+            <li><strong>Utilisateur</strong> (Vert) : API et Frontend</li>
+            <li><strong>Sécurité</strong> (Rouge foncé) : Secret Manager, VPC</li>
+            <li><strong>Observabilité</strong> (Gris) : Logging, Tracing, Monitoring</li>
+        </ul>
+
+        <h2>Flux de Données (Mis à jour)</h2>
+        <ol>
+            <li><strong>Ingestion Banques</strong> : Tink → n8n → Pub/Sub → Ingest Worker → Cloud SQL (+ DLQ si échec)</li>
+            <li><strong>Ingestion Factures ERP</strong> : ERP → n8n → Pub/Sub → Ingest Worker → Cloud SQL</li>
+            <li><strong>Webhooks</strong> : Providers → <strong>Cloud Armor</strong> → Core Webhook (+ idempotency) → Pub/Sub → Ingest Worker → Cloud SQL</li>
+            <li><strong>Upload CSV/JSON</strong> : Clients → <strong>Cloud Armor</strong> → <strong>Load Balancer</strong> → Core API → Pub/Sub → Ingest Worker → Cloud SQL</li>
+            <li><strong>Traitement IA</strong> : Cloud SQL → Pub/Sub → Worker/Jobs → <strong>Read Replica</strong> → Vertex AI → Cloud SQL (+ DLQ si échec)</li>
+            <li><strong>Lecture Utilisateur</strong> : Frontend → <strong>Cloud Armor</strong> → Core API → <strong>Redis</strong> → (miss) → <strong>Read Replica</strong></li>
+            <li><strong>Écriture Utilisateur</strong> : Frontend → Cloud Armor → Core API → Cloud SQL → <strong>Invalidation Redis</strong></li>
+        </ol>
+
+        <h2>Checklist de Mise en Production</h2>
+        <table>
+            <tr>
+                <th>Priorité</th>
+                <th>Action</th>
+                <th>Statut</th>
+            </tr>
+            <tr>
+                <td class="priority-p0">P0</td>
+                <td>Activer Cloud SQL HA + PITR</td>
+                <td>⬜ À faire</td>
+            </tr>
+            <tr>
+                <td class="priority-p0">P0</td>
+                <td>Configurer Secret Manager pour credentials</td>
+                <td>⬜ À faire</td>
+            </tr>
+            <tr>
+                <td class="priority-p0">P0</td>
+                <td>Créer VPC privé + Private Service Connect</td>
+                <td>⬜ À faire</td>
+            </tr>
+            <tr>
+                <td class="priority-p0">P0</td>
+                <td>Configurer Dead Letter Queues Pub/Sub</td>
+                <td>⬜ À faire</td>
+            </tr>
+            <tr>
+                <td class="priority-p1">P1</td>
+                <td>Déployer Cloud Armor (WAF)</td>
+                <td>⬜ À faire</td>
+            </tr>
+            <tr>
+                <td class="priority-p1">P1</td>
+                <td>Implémenter audit logging</td>
+                <td>⬜ À faire</td>
+            </tr>
+            <tr>
+                <td class="priority-p1">P1</td>
+                <td>Ajouter idempotency sur webhooks</td>
+                <td>⬜ À faire</td>
+            </tr>
+            <tr>
+                <td class="priority-p1">P1</td>
+                <td>Configurer rate limiting API</td>
+                <td>⬜ À faire</td>
+            </tr>
+            <tr>
+                <td class="priority-p2">P2</td>
+                <td>Déployer Memorystore (Redis)</td>
+                <td>⬜ À faire</td>
+            </tr>
+            <tr>
+                <td class="priority-p2">P2</td>
+                <td>Configurer Cloud Trace + dashboards</td>
+                <td>⬜ À faire</td>
+            </tr>
+        </table>
+
+        <h2>Architecture API-First</h2>
+        
+        <h3>Principe</h3>
+        <p>L'application suit une architecture <strong>API-First</strong> : <strong>Core API</strong> est le point d'entrée unique pour tous les clients (Frontend, clients externes, intégrations).</p>
+        
+        <h3>Avantages</h3>
+        <ul>
+            <li>✅ <strong>Réutilisabilité</strong> : L'API peut être utilisée par différents clients (web, mobile, intégrations)</li>
+            <li>✅ <strong>Découplage</strong> : Le Frontend et les autres clients sont indépendants</li>
+            <li>✅ <strong>Évolutivité</strong> : Facile d'ajouter de nouveaux clients sans modifier le backend</li>
+            <li>✅ <strong>Documentation</strong> : API documentée (OpenAPI/Swagger) pour faciliter l'intégration</li>
+            <li>✅ <strong>Versioning</strong> : Support de plusieurs versions d'API (<code>/api/v1/</code>, <code>/api/v2/</code>)</li>
+        </ul>
+
+        <h3>Endpoints Principaux de Core API</h3>
+        
+        <h4>1. CRUD Standard</h4>
+        <ul>
+            <li><code>GET /api/v1/transactions</code> - Liste des transactions</li>
+            <li><code>GET /api/v1/transactions/:id</code> - Détail d'une transaction</li>
+            <li><code>POST /api/v1/transactions</code> - Créer une transaction</li>
+            <li><code>PUT /api/v1/transactions/:id</code> - Mettre à jour</li>
+            <li><code>DELETE /api/v1/transactions/:id</code> - Supprimer</li>
+        </ul>
+
+        <h4>2. Upload de Fichiers CSV/JSON</h4>
+        <ul>
+            <li><code>POST /api/v1/ingest/upload</code> - Upload CSV/JSON
+                <ul>
+                    <li>Accepte : <code>multipart/form-data</code> (fichier) ou JSON (données directes)</li>
+                    <li>Formats supportés : CSV, JSON</li>
+                    <li>Validation automatique</li>
+                    <li>Parsing et normalisation</li>
+                    <li>Envoi dans Pub/Sub pour traitement asynchrone</li>
+                </ul>
+            </li>
+        </ul>
+
+        <h4>3. Export de Données</h4>
+        <ul>
+            <li><code>GET /api/v1/export/transactions</code> - Export CSV/JSON</li>
+            <li><code>GET /api/v1/export/factures</code> - Export factures</li>
+        </ul>
+
+        <h3>Authentification</h3>
+        <ul>
+            <li><strong>Firebase Auth</strong> pour le Frontend (JWT tokens)</li>
+            <li><strong>API Keys</strong> ou <strong>OAuth2</strong> pour les clients externes</li>
+            <li>Chaque requête authentifiée avec <code>tenant_id</code> pour isolation multi-tenant</li>
+        </ul>
+
+        <h2>Import CSV/JSON - Implémentation</h2>
+        
+        <h3>Flow d'Import</h3>
+        <ol>
+            <li><strong>Upload</strong> : Client envoie fichier CSV/JSON à <code>POST /api/v1/ingest/upload</code></li>
+            <li><strong>Validation</strong> : Core API valide le format et le schéma</li>
+            <li><strong>Parsing</strong> : Extraction et normalisation des données</li>
+            <li><strong>Queue</strong> : Envoi dans Pub/Sub (Topic: ingest)</li>
+            <li><strong>Traitement</strong> : Ingest Worker traite de manière asynchrone</li>
+            <li><strong>Stockage</strong> : Écriture dans Cloud SQL</li>
+            <li><strong>Réponse</strong> : Statut de l'upload retourné au client</li>
+            <li><strong>En cas d'échec</strong> : Message envoyé en DLQ pour analyse</li>
+        </ol>
+
+        <h3>Modifications Techniques Nécessaires</h3>
+        
+        <h4>1. Core API - Nouveau Endpoint</h4>
+        <p>Ajouter un endpoint <code>POST /api/v1/ingest/upload</code> pour recevoir les fichiers CSV/JSON, les parser, valider et les envoyer dans Pub/Sub.</p>
+        
+        <h4>2. Service de Parsing</h4>
+        <ul>
+            <li><strong>CSV</strong> : Utiliser <code>csv-parse</code> ou <code>papaparse</code></li>
+            <li><strong>JSON</strong> : Parsing natif + validation JSON Schema</li>
+            <li><strong>Normalisation</strong> : Adapter au format interne</li>
+        </ul>
+
+        <h4>3. Validation</h4>
+        <ul>
+            <li><strong>JSON Schema</strong> pour valider la structure</li>
+            <li><strong>Business Rules</strong> (montants valides, dates, etc.)</li>
+            <li><strong>Limites</strong> : Taille max fichier, nombre de lignes (selon plan)</li>
+        </ul>
+
+        <h4>4. Table de Monitoring</h4>
+        <p>Ajouter une table <code>import_jobs</code> dans Cloud SQL pour tracker les imports avec statut : <code>pending</code>, <code>processing</code>, <code>completed</code>, <code>failed</code>.</p>
+    </div>
+</body>
+</html>

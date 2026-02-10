@@ -1,0 +1,70 @@
+name: Deploy Backend (Cloud Run)
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-deploy.yml'
+
+env:
+  PROJECT_ID: invunion-prod
+  SERVICE_NAME: invunion-api
+  REGION: europe-west1
+  IMAGE: europe-west1-docker.pkg.dev/invunion-prod/invunion-registry/invunion-api
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker europe-west1-docker.pkg.dev
+
+      - name: Build Docker image
+        run: |
+          cd backend
+          docker build -t ${{ env.IMAGE }}:${{ github.sha }} .
+          docker tag ${{ env.IMAGE }}:${{ github.sha }} ${{ env.IMAGE }}:latest
+
+      - name: Push Docker image
+        run: |
+          docker push ${{ env.IMAGE }}:${{ github.sha }}
+          docker push ${{ env.IMAGE }}:latest
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ${{ env.SERVICE_NAME }} \
+            --image ${{ env.IMAGE }}:${{ github.sha }} \
+            --platform managed \
+            --region ${{ env.REGION }} \
+            --allow-unauthenticated \
+            --set-cloudsql-instances ${{ secrets.CLOUD_SQL_CONNECTION_NAME }} \
+            --set-env-vars "FIREBASE_PROJECT_ID=${{ env.PROJECT_ID }},NODE_ENV=production,DB_USER=${{ secrets.DB_USER }},DB_NAME=${{ secrets.DB_NAME }},CLOUD_SQL_CONNECTION_NAME=${{ secrets.CLOUD_SQL_CONNECTION_NAME }}" \
+            --set-secrets "DB_PASSWORD=${{ secrets.DB_PASSWORD_SECRET }}"
+
+      - name: Verify deployment
+        run: |
+          SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
+            --platform managed \
+            --region ${{ env.REGION }} \
+            --format 'value(status.url)')
+          echo "Service deployed at: $SERVICE_URL"
+          curl -f $SERVICE_URL/api/v1/health || exit 1

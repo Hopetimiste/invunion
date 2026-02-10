@@ -1,0 +1,172 @@
+{
+  "name": "GoCardless Simple Test",
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "id": "manual-trigger"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://bankaccountdata.gocardless.com/api/v2/requisitions/",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "bearerAuth",
+        "sendQuery": false,
+        "options": {}
+      },
+      "name": "List My Requisitions",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 300],
+      "id": "list-requisitions",
+      "credentials": {
+        "bearerAuth": {
+          "id": "gocardless-bearer",
+          "name": "GoCardless Bearer Auth"
+        }
+      },
+      "notes": "Liste toutes vos connexions bancaires (requisitions)"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Afficher les requisitions de manière lisible\nconst requisitions = items[0].json.results || [];\n\nconsole.log(`📊 Vous avez ${requisitions.length} requisition(s)`);\n\nif (requisitions.length === 0) {\n  console.log('⚠️ Aucune requisition trouvée.');\n  console.log('👉 Créez-en une sur https://bankaccountdata.gocardless.com/user-secrets/personal/');\n  return [];\n}\n\n// Prendre la première requisition pour la démo\nconst firstReq = requisitions[0];\n\nconsole.log('✅ Première requisition:', {\n  id: firstReq.id,\n  status: firstReq.status,\n  accounts: firstReq.accounts.length,\n  created: firstReq.created\n});\n\n// Retourner les comptes de la première requisition\nreturn firstReq.accounts.map(accountId => ({\n  json: {\n    accountId: accountId,\n    requisitionId: firstReq.id,\n    status: firstReq.status\n  }\n}));"
+      },
+      "name": "Parse Requisitions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300],
+      "id": "parse-requisitions",
+      "notes": "Extrait les comptes (accounts) de vos requisitions"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://bankaccountdata.gocardless.com/api/v2/accounts/{{$json.accountId}}/",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "bearerAuth",
+        "options": {}
+      },
+      "name": "Get Account Details",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [900, 300],
+      "id": "get-account-details",
+      "credentials": {
+        "bearerAuth": {
+          "id": "gocardless-bearer",
+          "name": "GoCardless Bearer Auth"
+        }
+      },
+      "notes": "Récupère les détails du compte (IBAN, banque, etc.)"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://bankaccountdata.gocardless.com/api/v2/accounts/{{$json.account_id}}/transactions/",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "bearerAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "date_from",
+              "value": "={{new Date(Date.now() - 90*24*60*60*1000).toISOString().split('T')[0]}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Fetch Transactions",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1120, 300],
+      "id": "fetch-transactions",
+      "credentials": {
+        "bearerAuth": {
+          "id": "gocardless-bearer",
+          "name": "GoCardless Bearer Auth"
+        }
+      },
+      "notes": "Récupère les transactions des 90 derniers jours"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Afficher un résumé lisible\nconst accountDetails = items[0].json;\nconst transactionsData = items[1].json;\n\nconst booked = transactionsData.transactions?.booked || [];\nconst pending = transactionsData.transactions?.pending || [];\n\nconsole.log('\\n🏦 COMPTE BANCAIRE');\nconsole.log('==================');\nconsole.log('IBAN:', accountDetails.iban);\nconsole.log('Banque:', accountDetails.institution_id);\nconsole.log('Devise:', accountDetails.currency);\n\nconsole.log('\\n💰 TRANSACTIONS');\nconsole.log('==================');\nconsole.log('Comptabilisées:', booked.length);\nconsole.log('En attente:', pending.length);\n\nif (booked.length > 0) {\n  console.log('\\n📋 Aperçu des transactions:');\n  booked.slice(0, 5).forEach((tx, i) => {\n    console.log(`${i+1}. ${tx.bookingDate} | ${tx.transactionAmount.amount} ${tx.transactionAmount.currency} | ${tx.remittanceInformationUnstructured || 'Sans description'}`);\n  });\n}\n\n// Retourner un objet résumé\nreturn [{\n  json: {\n    account: {\n      iban: accountDetails.iban,\n      bank: accountDetails.institution_id,\n      currency: accountDetails.currency,\n      id: accountDetails.id\n    },\n    summary: {\n      totalTransactions: booked.length + pending.length,\n      booked: booked.length,\n      pending: pending.length\n    },\n    transactions: booked.map(tx => ({\n      date: tx.bookingDate,\n      amount: parseFloat(tx.transactionAmount.amount),\n      currency: tx.transactionAmount.currency,\n      description: tx.remittanceInformationUnstructured || tx.remittanceInformationStructured || '',\n      counterparty: tx.debtorName || tx.creditorName || 'Unknown',\n      id: tx.internalTransactionId || tx.transactionId\n    }))\n  }\n}];"
+      },
+      "name": "Display Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1340, 300],
+      "id": "display-results",
+      "notes": "Affiche un résumé lisible dans les logs"
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "List My Requisitions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List My Requisitions": {
+      "main": [
+        [
+          {
+            "node": "Parse Requisitions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Requisitions": {
+      "main": [
+        [
+          {
+            "node": "Get Account Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Account Details": {
+      "main": [
+        [
+          {
+            "node": "Fetch Transactions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Transactions": {
+      "main": [
+        [
+          {
+            "node": "Display Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "pinData": {},
+  "versionId": "1"
+}

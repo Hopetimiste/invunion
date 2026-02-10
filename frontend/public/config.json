@@ -1,0 +1,11 @@
+{
+  "apiBaseUrl": "https://api.invunion.com",
+  "firebase": {
+    "apiKey": "AIzaSyDGf1gO9y2hKss9pB15hvDIXnHN2dvqHuY",
+    "authDomain": "invunion-prod.firebaseapp.com",
+    "projectId": "invunion-prod",
+    "appId": "1:730177123842:web:853301ffd9fe2cb02fd91b",
+    "messagingSenderId": "730177123842",
+    "storageBucket": "invunion-prod.firebasestorage.app"
+  }
+}

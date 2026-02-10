@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Union API - Get Firebase Token</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0a0f;
+            color: #f8fafc;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        .container { max-width: 600px; margin: 0 auto; }
+        h1 { 
+            font-size: 1.5rem; 
+            margin-bottom: 1.5rem;
+            color: #3b82f6;
+        }
+        .card {
+            background: #1a1a24;
+            border: 1px solid #2d2d3a;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        label { display: block; margin-bottom: 0.5rem; color: #94a3b8; }
+        input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #2d2d3a;
+            border-radius: 8px;
+            background: #12121a;
+            color: #f8fafc;
+            margin-bottom: 1rem;
+        }
+        button {
+            width: 100%;
+            padding: 0.75rem;
+            border: none;
+            border-radius: 8px;
+            background: #3b82f6;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover { background: #2563eb; }
+        button:disabled { background: #64748b; cursor: not-allowed; }
+        .token-box {
+            background: #12121a;
+            border: 1px solid #2d2d3a;
+            border-radius: 8px;
+            padding: 1rem;
+            word-break: break-all;
+            font-family: monospace;
+            font-size: 0.8rem;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .success { color: #10b981; }
+        .error { color: #ef4444; }
+        .info { color: #94a3b8; font-size: 0.9rem; margin-top: 0.5rem; }
+        .curl-box {
+            background: #12121a;
+            border: 1px solid #2d2d3a;
+            border-radius: 8px;
+            padding: 1rem;
+            font-family: monospace;
+            font-size: 0.75rem;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+        #status { margin: 1rem 0; padding: 1rem; border-radius: 8px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Union API - Firebase Token Generator</h1>
+        
+        <div class="card">
+            <label>Email</label>
+            <input type="email" id="email" value="francoissuretpro+6@gmail.com" placeholder="email@example.com">
+            
+            <label>Password</label>
+            <input type="password" id="password" placeholder="Your password">
+            
+            <button id="loginBtn" onclick="login()">Sign In & Get Token</button>
+        </div>
+
+        <div id="status"></div>
+
+        <div class="card" id="tokenCard" style="display: none;">
+            <h3 style="margin-bottom: 1rem;">✅ ID Token</h3>
+            <div class="token-box" id="tokenDisplay"></div>
+            <button style="margin-top: 1rem;" onclick="copyToken()">📋 Copy Token</button>
+            
+            <h3 style="margin: 1.5rem 0 1rem;">🧪 Test Command</h3>
+            <div class="curl-box" id="curlCommand"></div>
+            <button style="margin-top: 1rem;" onclick="copyCurl()">📋 Copy cURL</button>
+        </div>
+
+        <div class="card" id="userCard" style="display: none;">
+            <h3 style="margin-bottom: 1rem;">👤 User Info</h3>
+            <pre id="userInfo" style="font-size: 0.85rem; color: #94a3b8;"></pre>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js';
+        import { getAuth, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyA641lP92J8K54fn1F6vug_7NJwB5f-ywI",
+            authDomain: "br-project-481607.firebaseapp.com",
+            projectId: "br-project-481607",
+            appId: "1:1024369822478:web:d0b7a7885b94d94143a55f"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+
+        window.login = async function() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const statusDiv = document.getElementById('status');
+            const btn = document.getElementById('loginBtn');
+
+            if (!email || !password) {
+                statusDiv.innerHTML = '<div class="error">Please enter email and password</div>';
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = 'Signing in...';
+            statusDiv.innerHTML = '<div class="info">Authenticating...</div>';
+
+            try {
+                const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                const user = userCredential.user;
+                
+                // Get ID token
+                const token = await user.getIdToken(true);
+                
+                // Get token result with claims
+                const tokenResult = await user.getIdTokenResult();
+                
+                statusDiv.innerHTML = '<div class="success">✅ Successfully signed in!</div>';
+                
+                // Show token
+                document.getElementById('tokenCard').style.display = 'block';
+                document.getElementById('tokenDisplay').textContent = token;
+                window.currentToken = token;
+                
+                // Show curl command
+                const curlCmd = `curl -s -H "Authorization: Bearer ${token}" http://localhost:8080/api/v1/auth/me | jq .`;
+                document.getElementById('curlCommand').textContent = curlCmd;
+                window.currentCurl = curlCmd;
+                
+                // Show user info
+                document.getElementById('userCard').style.display = 'block';
+                document.getElementById('userInfo').textContent = JSON.stringify({
+                    uid: user.uid,
+                    email: user.email,
+                    claims: tokenResult.claims
+                }, null, 2);
+
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Sign In & Get Token';
+            }
+        };
+
+        window.copyToken = function() {
+            navigator.clipboard.writeText(window.currentToken);
+            alert('Token copied to clipboard!');
+        };
+
+        window.copyCurl = function() {
+            navigator.clipboard.writeText(window.currentCurl);
+            alert('cURL command copied to clipboard!');
+        };
+    </script>
+</body>
+</html>

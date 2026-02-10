@@ -1,0 +1,1861 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Architecture v3 - Invunion - Bank Reconciliation SaaS</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({ 
+            startOnLoad: true, 
+            theme: 'default',
+            flowchart: { useMaxWidth: true, htmlLabels: true, curve: 'basis' },
+            sequence: { useMaxWidth: true, showSequenceNumbers: true, actorMargin: 60, messageMargin: 40 }
+        });
+    </script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #e2e8f0;
+            line-height: 1.7;
+        }
+        .container { max-width: 1600px; margin: 0 auto; }
+
+        .header {
+            text-align: center;
+            padding: 50px 20px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 24px;
+            margin-bottom: 30px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.08);
+            position: relative;
+            overflow: hidden;
+        }
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899, #f59e0b);
+        }
+        h1 {
+            font-size: 2.8em;
+            background: linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+        .subtitle { color: #94a3b8; font-size: 1.2em; }
+        .version-badge {
+            display: inline-block; margin-top: 15px;
+            padding: 6px 16px; border-radius: 20px; font-size: 0.85em;
+            background: rgba(59,130,246,0.15); color: #60a5fa; border: 1px solid rgba(59,130,246,0.3);
+        }
+
+        .section {
+            background: rgba(255,255,255,0.03);
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 25px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        h2 {
+            color: #3b82f6;
+            font-size: 1.6em;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid rgba(59,130,246,0.3);
+            display: flex; align-items: center; gap: 10px;
+        }
+        h3 { color: #8b5cf6; font-size: 1.3em; margin: 25px 0 15px 0; }
+        h4 { color: #ec4899; font-size: 1.1em; margin: 20px 0 10px 0; }
+
+        .mermaid {
+            background: #ffffff;
+            padding: 30px;
+            border-radius: 12px;
+            margin: 20px 0;
+            overflow-x: auto;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 25px;
+        }
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        .card {
+            background: rgba(255,255,255,0.03);
+            border-radius: 12px;
+            padding: 25px;
+            border: 1px solid rgba(255,255,255,0.08);
+            transition: transform 0.3s ease, border-color 0.3s ease;
+        }
+        .card:hover { transform: translateY(-3px); border-color: rgba(59,130,246,0.3); }
+        .card-blue { border-left: 4px solid #3b82f6; }
+        .card-purple { border-left: 4px solid #8b5cf6; }
+        .card-green { border-left: 4px solid #10b981; }
+        .card-orange { border-left: 4px solid #f59e0b; }
+        .card-pink { border-left: 4px solid #ec4899; }
+        .card-cyan { border-left: 4px solid #06b6d4; }
+        .card-red { border-left: 4px solid #ef4444; }
+
+        .badge {
+            display: inline-block; padding: 4px 12px; border-radius: 20px;
+            font-size: 0.8em; font-weight: 600; margin-right: 8px; margin-bottom: 8px;
+        }
+        .badge-blue { background: rgba(59,130,246,0.2); color: #60a5fa; }
+        .badge-green { background: rgba(16,185,129,0.2); color: #34d399; }
+        .badge-purple { background: rgba(139,92,246,0.2); color: #a78bfa; }
+        .badge-orange { background: rgba(245,158,11,0.2); color: #fbbf24; }
+        .badge-pink { background: rgba(236,72,153,0.2); color: #f472b6; }
+        .badge-cyan { background: rgba(6,182,212,0.2); color: #22d3ee; }
+        .badge-red { background: rgba(239,68,68,0.2); color: #f87171; }
+        .badge-new { background: rgba(16,185,129,0.3); color: #34d399; border: 1px solid rgba(16,185,129,0.4); }
+        .badge-changed { background: rgba(245,158,11,0.3); color: #fbbf24; border: 1px solid rgba(245,158,11,0.4); }
+
+        ul, ol { margin: 15px 0; padding-left: 25px; }
+        li { margin: 8px 0; color: #cbd5e1; }
+        li strong { color: #e2e8f0; }
+
+        code {
+            background: rgba(139,92,246,0.15); padding: 3px 8px; border-radius: 4px;
+            font-family: 'Fira Code', 'Consolas', monospace; font-size: 0.9em; color: #a78bfa;
+        }
+        pre {
+            background: #0d1117; padding: 20px; border-radius: 8px;
+            overflow-x: auto; margin: 15px 0; border: 1px solid #30363d;
+        }
+        pre code { background: none; padding: 0; color: #c9d1d9; }
+
+        table {
+            width: 100%; border-collapse: collapse; margin: 20px 0;
+            background: rgba(0,0,0,0.2); border-radius: 8px; overflow: hidden;
+        }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.08); }
+        th { background: rgba(59,130,246,0.15); color: #60a5fa; font-weight: 600; }
+        tr:hover { background: rgba(255,255,255,0.03); }
+
+        .estimate-box {
+            background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(139,92,246,0.1));
+            border: 1px solid rgba(59,130,246,0.3); border-radius: 16px;
+            padding: 30px; text-align: center; margin: 30px 0;
+        }
+        .estimate-number {
+            font-size: 3.5em; font-weight: 700;
+            background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+        }
+        .estimate-label { font-size: 1.2em; color: #94a3b8; }
+
+        .naming-table td:first-child { color: #f87171; text-decoration: line-through; }
+        .naming-table td:nth-child(2) { color: #34d399; font-weight: 600; }
+
+        .improvement { position: relative; padding-left: 20px; }
+        .improvement::before {
+            content: ''; position: absolute; left: 0; top: 8px;
+            width: 10px; height: 10px; border-radius: 50%; background: #10b981;
+        }
+
+        @media (max-width: 900px) {
+            .grid-2, .grid-3 { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- ============================================ -->
+    <!-- HEADER                                        -->
+    <!-- ============================================ -->
+    <div class="header">
+        <h1>Invunion - Architecture v3</h1>
+        <p class="subtitle">Bank Reconciliation SaaS - Multi-Tenant B2B Platform</p>
+        <div class="version-badge">v3.0 - February 2026 &bull; Scalable &bull; API-First &bull; AI-Powered</div>
+        <p style="margin-top: 15px; color: #64748b; font-size: 0.9em;">
+            Designed for 500+ customers &bull; 10,000+ transactions/month &bull; Multi-provider integrations
+        </p>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- SECTION 0: NAMING MIGRATION                   -->
+    <!-- ============================================ -->
+    <div class="section">
+        <h2>0. Naming Standardization</h2>
+        <p style="margin-bottom: 15px;">All references unified under the <strong>Invunion</strong> brand:</p>
+        <table class="naming-table">
+            <thead>
+                <tr><th>Old Name</th><th>New Name</th><th>Where</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>union-api</td><td>invunion-api</td><td>Cloud Run service, Docker image, GitHub workflows</td></tr>
+                <tr><td>union-worker</td><td>invunion-worker</td><td>Cloud Run service, Docker image</td></tr>
+                <tr><td>union_db / union-db</td><td>invunion-db</td><td>Cloud SQL instance name, DB name</td></tr>
+                <tr><td>br-project-481607</td><td>invunion-prod (alias)</td><td>GCP Project (ID unchanged, display name updated)</td></tr>
+                <tr><td>project-br-union</td><td>invunion</td><td>GitHub repo, Cloudflare Pages project</td></tr>
+                <tr><td>union-api-*.run.app</td><td>api.invunion.com</td><td>Backend API URL</td></tr>
+                <tr><td>union-1dg.pages.dev</td><td>app.invunion.com</td><td>Frontend URL (Cloudflare Pages custom domain)</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- SECTION 1: ORGANIZATION HIERARCHY             -->
+    <!-- ============================================ -->
+    <div class="section">
+        <h2>1. Organization Hierarchy <span class="badge badge-new">NEW in v3</span></h2>
+        <p style="margin-bottom: 15px;">
+            Three-level hierarchy enabling large enterprise clients to manage multiple legal entities, each with isolated data.
+        </p>
+        <div class="mermaid">
+graph TB
+    classDef client fill:#3b82f6,stroke:#2563eb,stroke-width:2px,color:white
+    classDef org fill:#8b5cf6,stroke:#7c3aed,stroke-width:2px,color:white
+    classDef tenant fill:#10b981,stroke:#059669,stroke-width:2px,color:white
+    classDef account fill:#f59e0b,stroke:#d97706,stroke-width:2px,color:white
+    classDef data fill:#64748b,stroke:#475569,stroke-width:1px,color:white
+
+    Client["👤 CLIENT<br/>(Person / Admin)"]:::client
+    Org["🏢 ORGANIZATION<br/>(Mother Company)<br/><br/>billing plan • org settings<br/>consolidated reporting"]:::org
+
+    T1["🏭 ENTITY 1<br/>(Tenant / Subsidiary)<br/><br/>SIRET: 123...<br/>Country: FR"]:::tenant
+    T2["🏭 ENTITY 2<br/>(Tenant / Branch)<br/><br/>SIRET: 456...<br/>Country: DE"]:::tenant
+    T3["🏭 ENTITY 3<br/>(Tenant / Subsidiary)<br/><br/>SIRET: 789...<br/>Country: ES"]:::tenant
+
+    A1["📊 Invunion Account 1<br/><br/>• Bank connections<br/>• Transactions<br/>• Invoices<br/>• Matches"]:::account
+    A2["📊 Invunion Account 2<br/><br/>• Bank connections<br/>• Transactions<br/>• Invoices<br/>• Matches"]:::account
+    A3["📊 Invunion Account 3<br/><br/>• Bank connections<br/>• Transactions<br/>• Invoices<br/>• Matches"]:::account
+
+    Client --> Org
+    Org --> T1
+    Org --> T2
+    Org --> T3
+    T1 --> A1
+    T2 --> A2
+    T3 --> A3
+        </div>
+
+        <div class="grid-3">
+            <div class="card card-blue">
+                <h4>Organization Level</h4>
+                <ul>
+                    <li><strong>Billing plan</strong>: Starter / Pro / Enterprise</li>
+                    <li><strong>Consolidated view</strong>: Cross-tenant reporting</li>
+                    <li><strong>User management</strong>: Invite users across entities</li>
+                    <li><strong>Settings</strong>: Default currency, language, timezone</li>
+                </ul>
+            </div>
+            <div class="card card-green">
+                <h4>Tenant / Entity Level</h4>
+                <ul>
+                    <li><strong>Data isolation</strong>: Complete row-level security</li>
+                    <li><strong>Own connections</strong>: Separate bank accounts per entity</li>
+                    <li><strong>Own invoices</strong>: Each entity manages its own</li>
+                    <li><strong>Legal identity</strong>: SIRET, VAT, country</li>
+                </ul>
+            </div>
+            <div class="card card-orange">
+                <h4>Account (Data) Level</h4>
+                <ul>
+                    <li><strong>Transactions</strong>: Isolated by tenant_id</li>
+                    <li><strong>Matches</strong>: Scoped to tenant</li>
+                    <li><strong>Reports</strong>: Per-entity or consolidated</li>
+                    <li><strong>Audit trail</strong>: Full traceability</li>
+                </ul>
+            </div>
+        </div>
+
+        <h3>Database Schema Changes <span class="badge badge-new">NEW</span></h3>
+        <pre><code>-- NEW: Organization (Mother Company) layer
+CREATE TABLE organizations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    slug VARCHAR(100) UNIQUE NOT NULL,           -- URL-friendly identifier
+    plan VARCHAR(50) DEFAULT 'starter',           -- starter, pro, enterprise
+    billing_email VARCHAR(255),
+    max_tenants INTEGER DEFAULT 3,                -- per plan limit
+    max_users INTEGER DEFAULT 10,                 -- per plan limit
+    settings JSONB DEFAULT '{}',                  -- default currency, timezone, language
+    status VARCHAR(20) DEFAULT 'active',          -- active, suspended, cancelled
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- UPDATED: Tenants now belong to an Organization
+ALTER TABLE tenants ADD COLUMN organization_id UUID REFERENCES organizations(id);
+ALTER TABLE tenants ADD COLUMN legal_name VARCHAR(255);
+ALTER TABLE tenants ADD COLUMN tax_id VARCHAR(50);       -- SIRET, VAT number
+ALTER TABLE tenants ADD COLUMN country VARCHAR(2);        -- ISO 3166 alpha-2
+ALTER TABLE tenants ADD COLUMN timezone VARCHAR(50) DEFAULT 'Europe/Paris';
+
+-- NEW: Organization-level user memberships (cross-tenant access)
+CREATE TABLE organization_members (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    role VARCHAR(50) NOT NULL DEFAULT 'member',   -- owner, admin, member
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(organization_id, user_id)
+);
+
+-- UPDATED: Users can access multiple tenants within their org
+CREATE TABLE tenant_members (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    role VARCHAR(50) NOT NULL DEFAULT 'viewer',   -- admin, editor, viewer
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(tenant_id, user_id)
+);
+
+-- Indexes for performance at scale
+CREATE INDEX idx_tenants_org ON tenants(organization_id);
+CREATE INDEX idx_org_members_org ON organization_members(organization_id);
+CREATE INDEX idx_org_members_user ON organization_members(user_id);
+CREATE INDEX idx_tenant_members_tenant ON tenant_members(tenant_id);
+CREATE INDEX idx_tenant_members_user ON tenant_members(user_id);</code></pre>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- SECTION 2: MAIN ARCHITECTURE DIAGRAM          -->
+    <!-- ============================================ -->
+    <div class="section">
+        <h2>2. System Architecture</h2>
+        <div class="mermaid">
+graph TB
+    classDef external fill:#ec4899,stroke:#be185d,stroke-width:2px,color:white
+    classDef frontend fill:#64748b,stroke:#475569,stroke-width:2px,color:white
+    classDef api fill:#3b82f6,stroke:#2563eb,stroke-width:2px,color:white
+    classDef worker fill:#8b5cf6,stroke:#7c3aed,stroke-width:2px,color:white
+    classDef pubsub fill:#f59e0b,stroke:#d97706,stroke-width:2px,color:white
+    classDef storage fill:#10b981,stroke:#059669,stroke-width:2px,color:white
+    classDef secret fill:#ef4444,stroke:#dc2626,stroke-width:2px,color:white
+    classDef ai fill:#06b6d4,stroke:#0891b2,stroke-width:2px,color:white
+    classDef cache fill:#f97316,stroke:#ea580c,stroke-width:2px,color:white
+    classDef cf fill:#f97316,stroke:#ea580c,stroke-width:2px,color:white
+
+    subgraph Sources["🌍 External Data Sources"]
+        BankProviders["🏦 Banking Providers<br/>(Tink, GoCardless,<br/>Salt Edge, Plaid)"]:::external
+        InvoiceProviders["📄 Invoice Software<br/>(Pennylane, Stripe,<br/>QuickBooks, Xero...)"]:::external
+        CryptoProviders["💎 Crypto Wallets<br/>(Etherscan, etc.)<br/>🔜 Future"]:::external
+        CSVUpload["📁 CSV / JSON Upload<br/>(Manual Import)"]:::external
+    end
+
+    subgraph CF["☁️ Cloudflare"]
+        CFPages["💻 Cloudflare Pages<br/>app.invunion.com<br/><br/>React + Vite + TypeScript<br/>shadcn/ui + Tailwind<br/>Firebase Auth Client"]:::cf
+        CFDNS["🌐 Cloudflare DNS<br/>SSL + CDN + DDoS"]:::cf
+    end
+
+    subgraph GCP["☁️ Google Cloud Platform"]
+
+        subgraph CR1["Cloud Run #1 — INVUNION API"]
+            API["🚀 invunion-api<br/><br/>━━━━━━━━━━━━━━━━━━━━<br/>📡 REST API v1 Endpoints<br/>🔐 Firebase Auth + API Keys<br/>📤 File Upload (CSV/JSON)<br/>🔗 Webhook Reception<br/>✋ Manual Matching<br/>📊 Reports & Alerts<br/>🔌 Provider Connections<br/>🏢 Organization CRUD<br/>👥 Multi-tenant RBAC"]:::api
+        end
+
+        subgraph CR2["Cloud Run #2 — INVUNION WORKER"]
+            Worker["⚙️ invunion-worker<br/><br/>━━━━━━━━━━━━━━━━━━━━<br/>🔄 Ingestion & Normalization<br/>🤖 AI Matching (Vertex AI)<br/>📈 Confidence Scoring<br/>🔔 Alert Generation<br/>📋 Report Generation<br/>⏰ Scheduled Jobs (Polling)"]:::worker
+        end
+
+        subgraph Messaging["📨 Pub/Sub"]
+            TopicIngest[("📥 topic:<br/>ingest")]:::pubsub
+            TopicMatching[("🤝 topic:<br/>matching")]:::pubsub
+            TopicAlerts[("🔔 topic:<br/>alerts")]:::pubsub
+            DLQ1[("💀 DLQ<br/>ingest")]:::pubsub
+            DLQ2[("💀 DLQ<br/>matching")]:::pubsub
+            DLQ3[("💀 DLQ<br/>alerts")]:::pubsub
+        end
+
+        subgraph Data["💾 Data Layer"]
+            CloudSQL[("🐘 Cloud SQL<br/>PostgreSQL 15<br/><br/>• organizations<br/>• tenants + users<br/>• clients + suppliers<br/>• transactions<br/>• invoices<br/>• matches + alerts")]:::storage
+            Redis[("⚡ Memorystore<br/>Redis<br/><br/>• Session cache<br/>• Rate limiting<br/>• Report cache<br/><br/>🔜 Phase 2")]:::cache
+        end
+
+        SecretManager["🔐 Secret Manager"]:::secret
+        VertexAI["🤖 Vertex AI<br/>Gemini 2.0 Flash"]:::ai
+    end
+
+    FirebaseAuth["🔥 Firebase Auth<br/>(Authentication Only)"]:::external
+
+    %% Frontend flows
+    CFPages -->|"HTTPS"| CFDNS
+    CFDNS -->|"Proxy to Cloud Run"| API
+    CFPages -.->|"Auth tokens"| FirebaseAuth
+
+    %% Source flows
+    BankProviders -->|"Webhooks / OAuth"| API
+    InvoiceProviders -->|"Webhooks / API"| API
+    CryptoProviders -.->|"API calls 🔜"| API
+    CSVUpload -->|"POST /api/v1/ingest"| API
+
+    %% API → Messaging
+    API -->|"Publish"| TopicIngest
+    API -->|"Publish (manual)"| TopicMatching
+
+    %% API → Data
+    API <-->|"Read/Write"| CloudSQL
+    API -.->|"Cache 🔜"| Redis
+    API -.->|"Get secrets"| SecretManager
+
+    %% Messaging → Worker
+    TopicIngest -->|"Push subscribe"| Worker
+    TopicMatching -->|"Push subscribe"| Worker
+    TopicAlerts -->|"Push subscribe"| Worker
+
+    %% DLQ
+    TopicIngest -.->|"5 failures"| DLQ1
+    TopicMatching -.->|"5 failures"| DLQ2
+    TopicAlerts -.->|"5 failures"| DLQ3
+
+    %% Worker flows
+    Worker -->|"Write"| CloudSQL
+    Worker -->|"Call AI"| VertexAI
+    Worker -.->|"Get secrets"| SecretManager
+    Worker -->|"Publish"| TopicAlerts
+    Worker -->|"Publish"| TopicMatching
+    VertexAI -->|"Scores"| Worker
+        </div>
+
+        <div class="grid-2" style="margin-top:20px;">
+            <div class="card card-blue">
+                <h4>Key Changes from v2</h4>
+                <ul>
+                    <li class="improvement"><strong>Cloudflare DNS + CDN</strong>: SSL termination, DDoS protection, edge caching for static assets</li>
+                    <li class="improvement"><strong>Organization CRUD endpoints</strong>: New API routes for multi-org management</li>
+                    <li class="improvement"><strong>Redis cache</strong> (Phase 2): Report caching, session store, per-tenant rate limiting</li>
+                    <li class="improvement"><strong>Flexible provider registry</strong>: Plugin architecture for bank + invoice integrations</li>
+                    <li class="improvement"><strong>Gemini 2.0 Flash</strong>: Latest model for cost-efficient matching</li>
+                </ul>
+            </div>
+            <div class="card card-green">
+                <h4>Scalability Decisions</h4>
+                <ul>
+                    <li><strong>Cloudflare in front</strong>: Free CDN + SSL, no cold start penalty for static assets</li>
+                    <li><strong>Cloud Run auto-scale</strong>: 0 → 100 instances per service</li>
+                    <li><strong>PostgreSQL partitioning</strong>: Ready for table partitioning by tenant_id at 1M+ rows</li>
+                    <li><strong>Pub/Sub decoupling</strong>: Worker scales independently from API</li>
+                    <li><strong>DLQ monitoring</strong>: Zero data loss, full retry capability</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- SECTION 3: INTEGRATION LAYER                  -->
+    <!-- ============================================ -->
+    <div class="section">
+        <h2>3. Integration Layer <span class="badge badge-changed">IMPROVED in v3</span></h2>
+        <p style="margin-bottom:15px;">
+            Plugin-based provider architecture. Adding a new bank or invoice provider requires implementing a single interface — no changes to core logic.
+        </p>
+        <div class="mermaid">
+graph LR
+    classDef interface fill:#3b82f6,stroke:#2563eb,stroke-width:2px,color:white
+    classDef provider fill:#10b981,stroke:#059669,stroke-width:1px,color:white
+    classDef future fill:#94a3b8,stroke:#64748b,stroke-width:1px,color:white,stroke-dasharray:5
+
+    subgraph Core["Invunion Core"]
+        Registry["🔌 Provider Registry<br/><br/>registerProvider()<br/>getProvider(name)<br/>listProviders()"]:::interface
+        BankInterface["📋 IBankProvider<br/><br/>initConnection()<br/>completeAuth()<br/>fetchAccounts()<br/>fetchTransactions()<br/>handleWebhook()"]:::interface
+        InvoiceInterface["📋 IInvoiceProvider<br/><br/>initConnection()<br/>fetchInvoices()<br/>handleWebhook()<br/>syncInvoices()"]:::interface
+    end
+
+    subgraph Banks["Banking Providers"]
+        Tink["🏦 Tink<br/>PSD2 EU"]:::provider
+        GoCardless["🏦 GoCardless<br/>PSD2 EU"]:::provider
+        SaltEdge["🏦 Salt Edge<br/>Global"]:::provider
+        Plaid["🏦 Plaid<br/>US/CA/UK/EU"]:::provider
+        FutureBank["🏦 Future Bank<br/>Provider..."]:::future
+    end
+
+    subgraph Invoicing["Invoice Providers"]
+        Pennylane["📄 Pennylane"]:::provider
+        Stripe["📄 Stripe"]:::provider
+        QuickBooks["📄 QuickBooks"]:::future
+        Xero["📄 Xero"]:::future
+        FutureInv["📄 Future Invoice<br/>Provider..."]:::future
+    end
+
+    Registry --> BankInterface
+    Registry --> InvoiceInterface
+
+    BankInterface --> Tink
+    BankInterface --> GoCardless
+    BankInterface --> SaltEdge
+    BankInterface --> Plaid
+    BankInterface -.-> FutureBank
+
+    InvoiceInterface --> Pennylane
+    InvoiceInterface --> Stripe
+    InvoiceInterface -.-> QuickBooks
+    InvoiceInterface -.-> Xero
+    InvoiceInterface -.-> FutureInv
+        </div>
+
+        <h3>Provider Interface (TypeScript)</h3>
+        <pre><code>// src/services/providers/interfaces.ts
+
+export interface IBankProvider {
+  name: string;
+  displayName: string;
+  regions: string[];           // ['EU', 'US', 'UK', ...]
+  authType: 'oauth2' | 'api_key' | 'redirect';
+
+  // Connection lifecycle
+  initConnection(tenantId: string, config: any): Promise&lt;{ redirectUrl?: string; connectionId: string }&gt;;
+  completeAuth(callbackData: any): Promise&lt;{ connectionId: string; status: string }&gt;;
+
+  // Data fetching
+  fetchAccounts(connectionId: string): Promise&lt;BankAccount[]&gt;;
+  fetchTransactions(accountId: string, fromDate: Date): Promise&lt;NormalizedTransaction[]&gt;;
+
+  // Webhooks
+  verifyWebhook(headers: any, body: any): boolean;
+  handleWebhook(payload: any): Promise&lt;WebhookResult&gt;;
+}
+
+export interface IInvoiceProvider {
+  name: string;
+  displayName: string;
+
+  initConnection(tenantId: string, apiKey: string): Promise&lt;{ providerId: string }&gt;;
+  fetchInvoices(providerId: string, since?: Date): Promise&lt;NormalizedInvoice[]&gt;;
+  verifyWebhook(headers: any, body: any): boolean;
+  handleWebhook(payload: any): Promise&lt;WebhookResult&gt;;
+}
+
+// All providers normalize to these standard formats
+export interface NormalizedTransaction {
+  sourceId: string;
+  sourceType: string;
+  amount: number;
+  currency: string;
+  transactionDate: Date;
+  description: string;
+  counterpartyName?: string;
+  counterpartyIban?: string;
+  rawData: any;                // Original provider response preserved
+}
+
+export interface NormalizedInvoice {
+  sourceId: string;
+  sourceType: string;
+  invoiceNumber: string;
+  amount: number;
+  currency: string;
+  invoiceDate: Date;
+  dueDate?: Date;
+  customerName: string;
+  rawData: any;
+}</code></pre>
+
+        <div class="card card-orange" style="margin-top:20px;">
+            <h4>Adding a New Provider (3 steps)</h4>
+            <ol>
+                <li><strong>Implement the interface</strong>: Create <code>src/services/providers/banking/newprovider.ts</code></li>
+                <li><strong>Register it</strong>: Add to provider registry in <code>src/services/providers/index.ts</code></li>
+                <li><strong>Configure secrets</strong>: Add API keys to Secret Manager</li>
+            </ol>
+            <p style="margin-top:10px; color: #94a3b8;">
+                No changes to API routes, Worker logic, or database schema required.
+                The normalization layer ensures all providers output the same data format.
+            </p>
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- SECTION 4: MSC - SEQUENCE DIAGRAMS            -->
+    <!-- ============================================ -->
+    <div class="section">
+        <h2>4. Message Sequence Charts (MSC)</h2>
+        <p style="margin-bottom:15px;">
+            Complete interaction flows for all critical paths in the system.
+        </p>
+
+        <!-- MSC 1: Authentication -->
+        <h3>MSC 1: Authentication & Signup Flow</h3>
+        <div class="mermaid">
+sequenceDiagram
+    actor User
+    participant FE as Cloudflare Pages<br/>(Frontend)
+    participant Firebase as Firebase Auth
+    participant API as invunion-api<br/>(Cloud Run #1)
+    participant DB as Cloud SQL<br/>(PostgreSQL)
+
+    Note over User,DB: --- New User Signup ---
+
+    User->>FE: Click "Sign Up"
+    FE->>Firebase: createUserWithEmailAndPassword()
+    Firebase-->>FE: Firebase UID + ID Token
+    FE->>API: POST /api/v1/auth/signup-tenant<br/>{orgName, entityName, email}
+    API->>API: Verify Firebase ID Token
+    API->>DB: INSERT INTO organizations (name, plan)
+    DB-->>API: org_id
+    API->>DB: INSERT INTO tenants (organization_id, name)
+    DB-->>API: tenant_id
+    API->>DB: INSERT INTO users (firebase_uid, email)
+    DB-->>API: user_id
+    API->>DB: INSERT INTO organization_members (org_id, user_id, role='owner')
+    API->>DB: INSERT INTO tenant_members (tenant_id, user_id, role='admin')
+    API->>Firebase: setCustomUserClaims(uid, {orgId, tenantId, role})
+    API-->>FE: 201 {user, tenant, organization}
+    FE->>Firebase: getIdToken(true) // force refresh
+    FE-->>User: Redirect to Dashboard
+
+    Note over User,DB: --- Existing User Login ---
+
+    User->>FE: Enter email + password
+    FE->>Firebase: signInWithEmailAndPassword()
+    Firebase-->>FE: ID Token (with custom claims)
+    FE->>API: GET /api/v1/auth/me<br/>Authorization: Bearer {token}
+    API->>API: Verify token + extract claims
+    API->>DB: SELECT user + tenant + org WHERE firebase_uid = ?
+    DB-->>API: User profile + org + tenant data
+    API-->>FE: 200 {user, tenant, organization}
+    FE-->>User: Show Dashboard
+        </div>
+
+        <!-- MSC 2: Bank Connection -->
+        <h3>MSC 2: Bank Connection (OAuth Flow)</h3>
+        <div class="mermaid">
+sequenceDiagram
+    actor User
+    participant FE as Frontend
+    participant API as invunion-api
+    participant Registry as Provider Registry
+    participant Bank as Bank Provider<br/>(e.g., Tink)
+    participant PS as Pub/Sub
+    participant Worker as invunion-worker
+    participant DB as Cloud SQL
+
+    User->>FE: Click "Connect Bank Account"
+    FE->>API: POST /api/v1/connections/banking/init<br/>{provider: "tink"}
+    API->>Registry: getProvider("tink")
+    Registry-->>API: TinkProvider instance
+    API->>Bank: initConnection() → OAuth URL
+    Bank-->>API: {redirectUrl, connectionId}
+    API->>DB: INSERT bank_connections (status: 'pending')
+    API-->>FE: {redirectUrl}
+    FE-->>User: Redirect to Bank OAuth
+
+    User->>Bank: Authenticate with bank
+    Bank-->>API: GET /callback?code=ABC123
+    API->>Registry: getProvider("tink")
+    API->>Bank: completeAuth(code)
+    Bank-->>API: {accessToken, accounts[]}
+    API->>DB: UPDATE bank_connections (status: 'active')
+    API->>DB: INSERT bank_accounts (for each account)
+    API->>PS: Publish to 'ingest' {type: 'initial_sync', connectionId}
+    API-->>FE: 302 Redirect to Dashboard
+
+    Note over PS,DB: --- Async Processing ---
+
+    PS->>Worker: Push message (ingest)
+    Worker->>Bank: fetchTransactions(since: 90 days ago)
+    Bank-->>Worker: transactions[]
+    Worker->>Worker: Normalize to standard format
+    Worker->>DB: INSERT transactions (bulk)
+    Worker->>PS: Publish to 'matching' {tenantId, txIds[]}
+    Worker-->>PS: ACK
+
+    Note over PS,DB: --- Ongoing Webhooks ---
+
+    Bank->>API: POST /webhook/tink {new_transactions}
+    API->>API: Verify webhook signature
+    API->>DB: INSERT webhook_events (idempotency)
+    API->>PS: Publish to 'ingest' {type: 'webhook', data}
+    API-->>Bank: 200 OK
+        </div>
+
+        <!-- MSC 3: CSV Upload -->
+        <h3>MSC 3: CSV/JSON File Upload</h3>
+        <div class="mermaid">
+sequenceDiagram
+    actor User
+    participant FE as Frontend
+    participant API as invunion-api
+    participant DB as Cloud SQL
+    participant PS as Pub/Sub
+    participant Worker as invunion-worker
+
+    User->>FE: Select CSV file + type (transactions/invoices)
+    FE->>FE: Client-side validation (size, format)
+    FE->>API: POST /api/v1/ingest/upload<br/>multipart/form-data {file, type}
+    API->>API: Parse CSV headers, validate schema
+    API->>DB: INSERT import_jobs (status: 'pending', total_rows: N)
+    API->>PS: Publish to 'ingest'<br/>{type: 'csv', jobId, fileData}
+    API-->>FE: 202 Accepted {jobId}
+
+    FE->>FE: Poll job status every 3s
+
+    PS->>Worker: Push message (ingest)
+    
+    loop For each row in CSV
+        Worker->>Worker: Validate + normalize row
+        alt Valid Row
+            Worker->>DB: INSERT transaction/invoice
+            Worker->>DB: UPDATE import_jobs (processed_rows++)
+        else Invalid Row
+            Worker->>DB: UPDATE import_jobs (error_rows++, errors JSONB)
+        end
+    end
+
+    Worker->>DB: UPDATE import_jobs (status: 'completed')
+    Worker->>PS: Publish to 'matching' {tenantId, newTxIds[]}
+    Worker-->>PS: ACK
+
+    FE->>API: GET /api/v1/ingest/jobs/{jobId}
+    API->>DB: SELECT FROM import_jobs
+    API-->>FE: {status: 'completed', processed: 95, errors: 5}
+    FE-->>User: "Import complete: 95 imported, 5 errors"
+        </div>
+
+        <!-- MSC 4: AI Matching -->
+        <h3>MSC 4: AI-Powered Transaction Matching</h3>
+        <div class="mermaid">
+sequenceDiagram
+    participant PS as Pub/Sub
+    participant Worker as invunion-worker
+    participant DB as Cloud SQL
+    participant AI as Vertex AI<br/>(Gemini 2.0 Flash)
+    participant PSAlerts as Pub/Sub (alerts)
+
+    PS->>Worker: Push 'matching' message<br/>{tenantId, transactionIds[]}
+
+    Worker->>DB: SELECT unmatched transactions<br/>WHERE tenant_id = ? AND id IN (?)
+    DB-->>Worker: transactions[]
+    Worker->>DB: SELECT unmatched invoices<br/>WHERE tenant_id = ? AND status IN ('unpaid','partial')
+    DB-->>Worker: candidate invoices[]
+
+    loop For each transaction
+        Worker->>Worker: Pre-filter candidates<br/>(amount ±10%, date ±30d, currency match)
+        
+        loop For each candidate pair
+            Worker->>AI: Match prompt<br/>{transaction, invoice}
+            AI-->>Worker: {match: true, confidence: 0.92,<br/>reasoning: "Amount exact, dates close, <br/>counterparty matches supplier"}
+        end
+
+        alt confidence >= 0.85
+            Worker->>DB: INSERT matches (type: 'ai_auto', confidence)
+            Worker->>DB: UPDATE transaction (status: 'matched')
+            Worker->>DB: UPDATE invoice (recovery_percent via trigger)
+            Worker->>PSAlerts: Publish alert {type: 'new_match'}
+            Note right of Worker: Auto-matched ✅
+        else confidence 0.50 - 0.85
+            Worker->>DB: INSERT matches (type: 'ai_auto', status: 'pending_review')
+            Worker->>PSAlerts: Publish alert {type: 'review_needed'}
+            Note right of Worker: Needs human review ⚠️
+        else confidence < 0.50
+            Note right of Worker: No match, skip ❌
+        end
+    end
+
+    Worker-->>PS: ACK
+        </div>
+
+        <!-- MSC 5: Manual Matching -->
+        <h3>MSC 5: Manual Matching + Override</h3>
+        <div class="mermaid">
+sequenceDiagram
+    actor User
+    participant FE as Frontend
+    participant API as invunion-api
+    participant DB as Cloud SQL
+    participant PS as Pub/Sub (alerts)
+
+    User->>FE: Select transaction + invoice to match
+    User->>FE: Set matched amount (partial OK)
+    FE->>API: POST /api/v1/matches/manual<br/>{transactionId, invoiceId, matchedAmount}
+
+    API->>DB: SELECT transaction WHERE id = ? AND tenant_id = ?
+    API->>DB: SELECT invoice WHERE id = ? AND tenant_id = ?
+    API->>API: Validate: amount <= remaining unmatched
+
+    API->>DB: INSERT matches<br/>(type: 'manual', matched_by: userId,<br/>confidence: 1.0, matched_amount)
+    API->>DB: UPDATE transaction status<br/>(matched or partial)
+    Note over DB: Trigger: update_invoice_recovery()<br/>Auto-calculates recovery_percent
+    API->>DB: INSERT audit_log<br/>(action: 'match_created')
+    API->>PS: Publish alert {type: 'manual_match'}
+    API-->>FE: 201 {match}
+    FE-->>User: "Match created successfully"
+
+    Note over User,PS: --- Override AI Match ---
+
+    User->>FE: View AI-suggested match, click "Reject"
+    FE->>API: DELETE /api/v1/matches/{matchId}
+    API->>DB: UPDATE matches (status: 'cancelled')
+    API->>DB: UPDATE transaction (status: 'unmatched')
+    Note over DB: Trigger: recalculate recovery_percent
+    API->>DB: INSERT audit_log (action: 'match_cancelled')
+    API-->>FE: 200 OK
+        </div>
+
+        <!-- MSC 6: DLQ Error Handling -->
+        <h3>MSC 6: Error Handling & Dead Letter Queue</h3>
+        <div class="mermaid">
+sequenceDiagram
+    participant PS as Pub/Sub (ingest)
+    participant Worker as invunion-worker
+    participant DLQ as Dead Letter Queue
+    participant API as invunion-api
+    participant DB as Cloud SQL
+    actor Admin
+
+    PS->>Worker: Push message (attempt 1)
+    Worker->>Worker: Processing fails ❌
+    Worker-->>PS: NACK (no acknowledgment)
+
+    PS->>Worker: Push message (attempt 2, backoff)
+    Worker->>Worker: Processing fails ❌
+    Worker-->>PS: NACK
+
+    PS->>Worker: Push message (attempt 3)
+    Worker->>Worker: Processing fails ❌
+    Worker-->>PS: NACK
+
+    PS->>Worker: Push message (attempt 4)
+    Worker->>Worker: Processing fails ❌
+    Worker-->>PS: NACK
+
+    PS->>Worker: Push message (attempt 5 — final)
+    Worker->>Worker: Processing fails ❌
+    Worker-->>PS: NACK
+
+    PS->>DLQ: Move to Dead Letter Queue
+    Note over DLQ: Message preserved with<br/>original payload + error metadata
+
+    Note over Admin,DLQ: --- Admin Monitoring ---
+
+    Admin->>API: GET /api/v1/admin/dlq
+    API->>DLQ: Pull messages (peek)
+    DLQ-->>API: {messages: [...]}
+    API-->>Admin: Show DLQ dashboard
+
+    Admin->>API: POST /api/v1/admin/dlq/{msgId}/retry
+    API->>PS: Re-publish original message to 'ingest'
+    API->>DB: INSERT audit_log (action: 'dlq_retry')
+    API-->>Admin: "Message re-queued"
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- SECTION 5: CLOUD RUN CONFIG                   -->
+    <!-- ============================================ -->
+    <div class="section">
+        <h2>5. Cloud Run Services Configuration</h2>
+
+        <div class="grid-2">
+            <div class="card card-blue">
+                <h3>invunion-api (Cloud Run #1)</h3>
+                <p style="color: #60a5fa; font-weight: 600; margin-bottom: 15px;">Synchronous API &bull; Point of Entry &bull; API-First</p>
+                <table>
+                    <tr><td>Region</td><td><code>europe-west1</code></td></tr>
+                    <tr><td>Min instances</td><td><code>1</code> (avoid cold starts) <span class="badge badge-changed">was 0</span></td></tr>
+                    <tr><td>Max instances</td><td><code>50</code> <span class="badge badge-changed">was 10</span></td></tr>
+                    <tr><td>Concurrency</td><td><code>80</code> req/instance</td></tr>
+                    <tr><td>CPU</td><td><code>1 vCPU</code></td></tr>
+                    <tr><td>Memory</td><td><code>512 MiB</code></td></tr>
+                    <tr><td>Timeout</td><td><code>60s</code></td></tr>
+                    <tr><td>CPU Allocation</td><td><code>CPU always allocated</code> <span class="badge badge-new">NEW</span></td></tr>
+                </table>
+                <p style="margin-top:10px; color: #94a3b8; font-size:0.9em;">
+                    Min=1 avoids cold starts for better UX. At 500 customers, expect ~5-10 active instances during business hours.
+                </p>
+            </div>
+
+            <div class="card card-purple">
+                <h3>invunion-worker (Cloud Run #2)</h3>
+                <p style="color: #a78bfa; font-weight: 600; margin-bottom: 15px;">Async Processing &bull; AI Matching &bull; Background Jobs</p>
+                <table>
+                    <tr><td>Region</td><td><code>europe-west1</code></td></tr>
+                    <tr><td>Min instances</td><td><code>0</code> (scale to zero OK)</td></tr>
+                    <tr><td>Max instances</td><td><code>20</code> <span class="badge badge-changed">was 5</span></td></tr>
+                    <tr><td>Concurrency</td><td><code>10</code> jobs/instance</td></tr>
+                    <tr><td>CPU</td><td><code>2 vCPU</code></td></tr>
+                    <tr><td>Memory</td><td><code>1 GiB</code></td></tr>
+                    <tr><td>Timeout</td><td><code>900s</code> (15 min)</td></tr>
+                    <tr><td>CPU Allocation</td><td><code>CPU only during request</code></td></tr>
+                </table>
+                <p style="margin-top:10px; color: #94a3b8; font-size:0.9em;">
+                    Scale-to-zero saves costs when idle. Max=20 handles bulk processing spikes (month-end reconciliation).
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- SECTION 6: API ENDPOINTS                      -->
+    <!-- ============================================ -->
+    <div class="section">
+        <h2>6. API Endpoints (v1)</h2>
+        <pre><code># ─── Authentication ───────────────────────────────
+POST   /api/v1/auth/signup-tenant          # Create org + tenant + user
+GET    /api/v1/auth/me                     # Get current user profile
+POST   /api/v1/auth/refresh-claims         # Force refresh Firebase claims
+
+# ─── Organizations (NEW) ─────────────────────────
+GET    /api/v1/organizations/:id           # Get organization details
+PUT    /api/v1/organizations/:id           # Update organization settings
+GET    /api/v1/organizations/:id/tenants   # List all tenants in org
+POST   /api/v1/organizations/:id/tenants   # Create new tenant in org
+GET    /api/v1/organizations/:id/members   # List org members
+POST   /api/v1/organizations/:id/invite    # Invite user to org
+GET    /api/v1/organizations/:id/reports   # Consolidated cross-tenant report
+
+# ─── Tenant Management ───────────────────────────
+GET    /api/v1/tenants/current             # Get active tenant context
+PUT    /api/v1/tenants/current             # Update tenant settings
+POST   /api/v1/tenants/switch/:tenantId    # Switch active tenant context
+
+# ─── Banking Connections ──────────────────────────
+GET    /api/v1/connections/banking/providers         # List available providers
+POST   /api/v1/connections/banking/init              # Start OAuth
+GET    /api/v1/connections/banking/:provider/callback # OAuth callback
+GET    /api/v1/connections/banking                    # List connections
+POST   /api/v1/connections/banking/:id/sync          # Trigger sync
+DELETE /api/v1/connections/banking/:id                # Disconnect
+
+# ─── Transactions ─────────────────────────────────
+GET    /api/v1/transactions                # List (filters: status, date, amount, search)
+GET    /api/v1/transactions/stats          # Aggregated statistics
+GET    /api/v1/transactions/:id            # Single transaction
+POST   /api/v1/transactions                # Create (manual)
+POST   /api/v1/transactions/bulk           # Bulk create
+PUT    /api/v1/transactions/:id            # Update
+DELETE /api/v1/transactions/:id            # Delete
+
+# ─── Invoices ─────────────────────────────────────
+GET    /api/v1/invoices                    # List (filters: status, type, supplier, overdue)
+GET    /api/v1/invoices/stats              # Statistics
+GET    /api/v1/invoices/:id                # Single invoice + matches
+POST   /api/v1/invoices                    # Create
+POST   /api/v1/invoices/bulk               # Bulk create
+PUT    /api/v1/invoices/:id                # Update
+DELETE /api/v1/invoices/:id                # Delete
+
+# ─── Suppliers ────────────────────────────────────
+GET    /api/v1/suppliers                   # List
+GET    /api/v1/suppliers/search            # Quick search (autocomplete)
+POST   /api/v1/suppliers                   # Create
+PUT    /api/v1/suppliers/:id               # Update
+DELETE /api/v1/suppliers/:id               # Soft delete
+
+# ─── Matches (Reconciliation) ────────────────────
+GET    /api/v1/matches                     # List matches
+GET    /api/v1/matches/stats               # Matching stats
+POST   /api/v1/matches/manual              # Create manual match (partial OK)
+POST   /api/v1/matches/bulk                # Bulk create
+PUT    /api/v1/matches/:id                 # Update
+DELETE /api/v1/matches/:id                 # Cancel match
+
+# ─── Alerts ───────────────────────────────────────
+GET    /api/v1/alerts                      # List
+GET    /api/v1/alerts/unread-count         # Badge count
+PUT    /api/v1/alerts/:id                  # Mark read/dismissed
+POST   /api/v1/alerts/mark-all-read       # Batch
+
+# ─── Reports ──────────────────────────────────────
+GET    /api/v1/reports/reconciliation      # Summary (JSON or CSV export)
+GET    /api/v1/reports/transactions-by-date # Date breakdown
+GET    /api/v1/reports/match-breakdown     # Match type analytics
+
+# ─── Ingest (Upload & Webhooks) ──────────────────
+POST   /api/v1/ingest/upload               # CSV/JSON upload
+GET    /api/v1/ingest/jobs                  # List import jobs
+GET    /api/v1/ingest/jobs/:id              # Job status
+POST   /api/v1/ingest/webhook/tink         # Tink webhooks
+POST   /api/v1/ingest/webhook/:provider    # Generic provider webhooks
+
+# ─── Admin (SuperAdmin) ──────────────────────────
+GET    /api/v1/admin/summary               # Platform-wide stats
+GET    /api/v1/admin/organizations          # List all orgs (NEW)
+GET    /api/v1/admin/tenants               # List all tenants
+POST   /api/v1/admin/tenants/:id/disable   # Suspend tenant
+GET    /api/v1/admin/dlq                   # DLQ monitoring (NEW)
+POST   /api/v1/admin/dlq/:id/retry        # Retry DLQ message (NEW)
+GET    /api/v1/admin/logs                  # System logs</code></pre>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- SECTION 7: DATA MODEL (COMPLETE)              -->
+    <!-- ============================================ -->
+    <div class="section">
+        <h2>7. Complete Data Model</h2>
+
+        <h3>Entity Relationship Diagram</h3>
+        <div class="mermaid">
+erDiagram
+    organizations ||--o{ tenants : "has many"
+    organizations ||--o{ organization_members : "has many"
+    tenants ||--o{ tenant_members : "has many"
+    tenants ||--o{ bank_connections : "has many"
+    tenants ||--o{ transactions : "has many"
+    tenants ||--o{ invoices : "has many"
+    tenants ||--o{ suppliers : "has many"
+    tenants ||--o{ clients : "has many"
+    tenants ||--o{ matches : "has many"
+    tenants ||--o{ alerts : "has many"
+
+    users ||--o{ organization_members : "belongs to"
+    users ||--o{ tenant_members : "belongs to"
+
+    bank_connections ||--o{ bank_accounts : "has many"
+    bank_accounts ||--o{ transactions : "has many"
+    suppliers ||--o{ transactions : "linked to"
+    suppliers ||--o{ invoices : "received from"
+    clients ||--o{ invoices : "issued to"
+    clients ||--o{ transactions : "paid by"
+
+    transactions ||--o{ matches : "matched"
+    invoices ||--o{ matches : "matched"
+
+    organizations {
+        uuid id PK
+        string name
+        string slug UK
+        string plan
+        string billing_email
+        int max_tenants
+        int max_users
+        jsonb settings
+        string status
+    }
+    tenants {
+        uuid id PK
+        uuid organization_id FK
+        string name
+        string legal_name
+        string tax_id
+        string country
+        string timezone
+        string status
+    }
+    users {
+        uuid id PK
+        string firebase_uid UK
+        string email
+        string first_name
+        string last_name
+    }
+    clients {
+        uuid id PK
+        uuid tenant_id FK
+        string client_organization_id
+        string client_entity_id
+        string client_service_id
+        string vat_number
+        string label
+        string category
+        string recipient_name
+        string email_contact
+        decimal payment_score
+        int avg_payment_days
+        string external_reference
+        string internal_reference
+    }
+    suppliers {
+        uuid id PK
+        uuid tenant_id FK
+        string name
+        string email
+        string tax_id
+        string iban
+        int payment_terms_days
+        string status
+    }
+    transactions {
+        uuid id PK
+        uuid tenant_id FK
+        uuid account_id FK
+        uuid supplier_id FK
+        uuid client_id FK
+        string source_type
+        string source_id
+        decimal amount
+        string currency
+        date transaction_date
+        date booking_date
+        date value_date
+        string payment_method
+        string description_original
+        string counterparty_name
+        string counterparty_iban
+        string status
+    }
+    invoices {
+        uuid id PK
+        uuid tenant_id FK
+        uuid supplier_id FK
+        uuid client_id FK
+        uuid provider_id FK
+        string invoice_number
+        string external_reference
+        date invoice_date
+        date due_date
+        date payment_expected_date
+        decimal amount_excl_vat
+        decimal vat_amount
+        decimal amount_incl_vat
+        string currency
+        string payment_method
+        string recipient_name
+        string invoice_type
+        decimal recovery_percent
+        string status
+    }
+    matches {
+        uuid id PK
+        uuid tenant_id FK
+        uuid transaction_id FK
+        uuid invoice_id FK
+        decimal matched_amount
+        string match_type
+        decimal confidence_score
+        string ai_reasoning
+        uuid matched_by FK
+        string status
+    }
+        </div>
+
+        <!-- CLIENTS TABLE (NEW) -->
+        <h3>NEW: Clients Table <span class="badge badge-new">NEW in v3</span></h3>
+        <div class="card card-green" style="margin-bottom:20px;">
+            <p style="margin-bottom:10px;">
+                <strong>Why add clients?</strong> Your model currently has <code>suppliers</code> (those you pay) but nothing for
+                <strong>those who pay you</strong> (clients). Since you manage both <code>invoice_type: 'issued'</code> and <code>'received'</code>,
+                the <code>clients</code> table completes the picture and adds business intelligence (payment scoring, average delay).
+            </p>
+            <p><strong>Relationship chain:</strong> <code>Client → Invoices (issued) → Matches → Transactions</code></p>
+        </div>
+        <pre><code>-- ============================================
+-- CLIENTS (NEW - Those who pay you)
+-- ============================================
+-- Mirror of suppliers (those you pay), but for your customers
+-- Enables: payment scoring, average delay, client analytics
+
+CREATE TABLE clients (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+
+    -- Client's OWN external identifiers (not Invunion FKs)
+    client_organization_id VARCHAR(255),                   -- Client's own organization ID (e.g., SIREN, group ID)
+    client_entity_id VARCHAR(255),                         -- Client's own entity/subsidiary ID (e.g., SIRET, branch ID)
+    client_service_id VARCHAR(255),                        -- Client's department/service (e.g., "Procurement", "IT")
+
+    -- Identification
+    label VARCHAR(255) NOT NULL,                          -- Display name / company name
+    recipient_name VARCHAR(255),                          -- Legal recipient name (if different from label)
+    vat_number VARCHAR(50),                               -- TVA / VAT number
+    category VARCHAR(50) DEFAULT 'professional'
+        CHECK (category IN ('individual', 'professional', 'governmental')),
+
+    -- Contact
+    email_contact VARCHAR(255),
+    phone_contact VARCHAR(50),
+    address TEXT,
+    country VARCHAR(2),                                    -- ISO 3166 alpha-2
+
+    -- References
+    external_reference VARCHAR(255),                       -- Client's own reference / ID in their system
+    internal_reference VARCHAR(255),                       -- Your internal reference for this client
+
+    -- Payment Analytics (auto-calculated via trigger)
+    payment_score DECIMAL(5,2) DEFAULT 0                   -- 0-100%, auto-calculated from match history
+        CHECK (payment_score >= 0 AND payment_score <= 100),
+    avg_payment_days INTEGER DEFAULT 0,                    -- Average days between invoice_date and payment date
+    total_invoiced DECIMAL(15,2) DEFAULT 0,                -- Total amount invoiced (running total)
+    total_paid DECIMAL(15,2) DEFAULT 0,                    -- Total amount paid/matched (running total)
+    last_invoice_date DATE,                                -- Date of most recent invoice
+    last_payment_date DATE,                                -- Date of most recent matched payment
+    invoice_count INTEGER DEFAULT 0,                       -- Total number of invoices
+
+    -- Status
+    status VARCHAR(50) DEFAULT 'active'
+        CHECK (status IN ('active', 'inactive', 'blocked', 'prospect')),
+
+    -- Metadata
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+
+    -- Uniqueness: one client label per tenant (can be relaxed if needed)
+    CONSTRAINT unique_client_per_tenant UNIQUE(tenant_id, label, vat_number)
+);
+
+-- Indexes
+CREATE INDEX idx_clients_tenant ON clients(tenant_id);
+CREATE INDEX idx_clients_client_org ON clients(client_organization_id);
+CREATE INDEX idx_clients_client_entity ON clients(client_entity_id);
+CREATE INDEX idx_clients_category ON clients(tenant_id, category);
+CREATE INDEX idx_clients_status ON clients(tenant_id, status);
+CREATE INDEX idx_clients_vat ON clients(vat_number);
+CREATE INDEX idx_clients_payment_score ON clients(tenant_id, payment_score);
+CREATE INDEX idx_clients_external_ref ON clients(external_reference);
+CREATE INDEX idx_clients_name ON clients(tenant_id, label);
+
+-- Trigger: auto-update updated_at
+CREATE TRIGGER update_clients_updated_at BEFORE UPDATE ON clients
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();</code></pre>
+
+        <h4>Auto-Calculated Client Analytics (Trigger)</h4>
+        <pre><code>-- TRIGGER: Update client payment analytics when matches change
+-- Recalculates: payment_score, avg_payment_days, total_paid, last_payment_date
+
+CREATE OR REPLACE FUNCTION update_client_payment_analytics()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_client_id UUID;
+    v_total_invoiced DECIMAL(15,2);
+    v_total_paid DECIMAL(15,2);
+    v_avg_days INTEGER;
+    v_invoice_count INTEGER;
+    v_last_payment DATE;
+    v_last_invoice DATE;
+BEGIN
+    -- Get client_id from the invoice linked to this match
+    SELECT i.client_id INTO v_client_id
+    FROM invoices i
+    WHERE i.id = COALESCE(NEW.invoice_id, OLD.invoice_id)
+      AND i.client_id IS NOT NULL;
+
+    -- Only proceed if invoice has a client
+    IF v_client_id IS NULL THEN RETURN NEW; END IF;
+
+    -- Calculate totals from all invoices for this client
+    SELECT
+        COALESCE(SUM(amount_incl_vat), 0),
+        COUNT(*),
+        MAX(invoice_date)
+    INTO v_total_invoiced, v_invoice_count, v_last_invoice
+    FROM invoices
+    WHERE client_id = v_client_id AND status != 'cancelled';
+
+    -- Calculate total matched/paid amount
+    SELECT COALESCE(SUM(m.matched_amount), 0)
+    INTO v_total_paid
+    FROM matches m
+    JOIN invoices i ON i.id = m.invoice_id
+    WHERE i.client_id = v_client_id AND m.status = 'active';
+
+    -- Calculate average payment delay (days between invoice_date and transaction_date)
+    SELECT COALESCE(AVG(t.transaction_date - i.invoice_date)::INTEGER, 0)
+    INTO v_avg_days
+    FROM matches m
+    JOIN invoices i ON i.id = m.invoice_id
+    JOIN transactions t ON t.id = m.transaction_id
+    WHERE i.client_id = v_client_id AND m.status = 'active';
+
+    -- Last payment date
+    SELECT MAX(t.transaction_date)
+    INTO v_last_payment
+    FROM matches m
+    JOIN transactions t ON t.id = m.transaction_id
+    JOIN invoices i ON i.id = m.invoice_id
+    WHERE i.client_id = v_client_id AND m.status = 'active';
+
+    -- Update client analytics
+    UPDATE clients SET
+        total_invoiced = v_total_invoiced,
+        total_paid = v_total_paid,
+        invoice_count = v_invoice_count,
+        payment_score = CASE
+            WHEN v_total_invoiced > 0
+            THEN LEAST(100, (v_total_paid / v_total_invoiced) * 100)
+            ELSE 0
+        END,
+        avg_payment_days = v_avg_days,
+        last_invoice_date = v_last_invoice,
+        last_payment_date = v_last_payment,
+        updated_at = NOW()
+    WHERE id = v_client_id;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER update_client_analytics_on_match
+    AFTER INSERT OR UPDATE OR DELETE ON matches
+    FOR EACH ROW EXECUTE FUNCTION update_client_payment_analytics();</code></pre>
+
+        <!-- UPDATED TABLES: Add client_id -->
+        <h3>Updated Tables: Adding client_id <span class="badge badge-changed">CHANGED</span></h3>
+        <pre><code>-- Add client_id to invoices (links invoices issued TO a client)
+ALTER TABLE invoices ADD COLUMN client_id UUID REFERENCES clients(id) ON DELETE SET NULL;
+CREATE INDEX idx_invoices_client ON invoices(client_id);
+
+-- Add client_id to transactions (links incoming payments FROM a client)
+ALTER TABLE transactions ADD COLUMN client_id UUID REFERENCES clients(id) ON DELETE SET NULL;
+CREATE INDEX idx_transactions_client ON transactions(client_id);</code></pre>
+
+        <!-- FULL TRANSACTIONS TABLE -->
+        <h3>Full Table: transactions (all columns)</h3>
+        <pre><code>CREATE TABLE transactions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    account_id UUID REFERENCES bank_accounts(id) ON DELETE SET NULL,
+    supplier_id UUID REFERENCES suppliers(id) ON DELETE SET NULL,
+    client_id UUID REFERENCES clients(id) ON DELETE SET NULL,       -- NEW: link to client
+
+    -- Source tracking (deduplication)
+    source_type VARCHAR(50) NOT NULL,                    -- tink, gocardless, salt_edge, plaid, csv, api, manual, n8n
+    source_id VARCHAR(255) NOT NULL,                     -- Unique ID from source
+    source_raw JSONB,                                    -- Raw provider response preserved
+
+    -- Amount & Currency
+    amount DECIMAL(15,2) NOT NULL,
+    currency VARCHAR(3) DEFAULT 'EUR',
+
+    -- Dates
+    transaction_date DATE NOT NULL,                      -- Date de la transaction bancaire
+    booking_date DATE,                                   -- Date de comptabilisation
+    value_date DATE,                                     -- Date de valeur
+    added_at TIMESTAMPTZ DEFAULT NOW(),                  -- Date d'ajout dans l'application
+
+    -- Payment info
+    payment_method VARCHAR(50),                          -- card, transfer, direct_debit, cash, check
+    payment_context VARCHAR(50),                         -- CIT, MIT, recurring, one_time
+    external_reference VARCHAR(255),                     -- Référence externe (sales order, PO number)
+
+    -- Descriptions
+    description_original TEXT,                           -- Description originale de la banque
+    description_display TEXT,                            -- Description modifiable par l'utilisateur
+    category VARCHAR(100),                               -- Catégorisation
+
+    -- Counterparty info
+    counterparty_name VARCHAR(255),
+    counterparty_iban VARCHAR(50),
+    counterparty_bic VARCHAR(11),
+
+    -- Reconciliation status
+    status VARCHAR(50) DEFAULT 'unconsidered',           -- unconsidered, unmatched, matched, ignored, pending
+
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+
+    CONSTRAINT unique_source_transaction UNIQUE(tenant_id, source_type, source_id)
+);
+
+-- Indexes (complete set for performance at scale)
+CREATE INDEX idx_transactions_tenant ON transactions(tenant_id);
+CREATE INDEX idx_transactions_status ON transactions(tenant_id, status);
+CREATE INDEX idx_transactions_date ON transactions(tenant_id, transaction_date);
+CREATE INDEX idx_transactions_account ON transactions(account_id);
+CREATE INDEX idx_transactions_supplier ON transactions(supplier_id);
+CREATE INDEX idx_transactions_client ON transactions(client_id);
+CREATE INDEX idx_transactions_source ON transactions(source_type);
+CREATE INDEX idx_transactions_amount ON transactions(amount);
+CREATE INDEX idx_transactions_payment_method ON transactions(payment_method);
+CREATE INDEX idx_transactions_external_ref ON transactions(external_reference);
+-- Composite index for AI matching queries
+CREATE INDEX idx_transactions_matching ON transactions(tenant_id, status, transaction_date, amount);</code></pre>
+
+        <!-- FULL INVOICES TABLE -->
+        <h3>Full Table: invoices (all columns)</h3>
+        <pre><code>CREATE TABLE invoices (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    provider_id UUID REFERENCES invoice_providers(id) ON DELETE SET NULL,
+    supplier_id UUID REFERENCES suppliers(id) ON DELETE SET NULL,    -- For invoices RECEIVED
+    client_id UUID REFERENCES clients(id) ON DELETE SET NULL,        -- NEW: For invoices ISSUED
+
+    -- Source tracking
+    source_type VARCHAR(50) NOT NULL,                    -- pennylane, stripe, csv, api, manual
+    source_id VARCHAR(255) NOT NULL,                     -- Unique ID from source
+    source_raw JSONB,                                    -- Raw provider response preserved
+
+    -- Invoice identification
+    invoice_number VARCHAR(100),
+    external_reference VARCHAR(255),                     -- PO number, sales order, etc.
+
+    -- Dates
+    invoice_date DATE,                                   -- Date de facturation
+    due_date DATE,                                       -- Date d'échéance
+    payment_expected_date DATE,                          -- Date de paiement prévue
+
+    -- Amounts
+    amount_excl_vat DECIMAL(15,2) NOT NULL,             -- Montant HT
+    vat_amount DECIMAL(15,2),                            -- Montant TVA
+    amount_incl_vat DECIMAL(15,2) NOT NULL,             -- Montant TTC
+    currency VARCHAR(3) DEFAULT 'EUR',
+
+    -- Payment info
+    payment_method VARCHAR(50),                          -- Mode de paiement attendu
+
+    -- Recipient / Customer info
+    recipient_name VARCHAR(255),                         -- Nom du destinataire
+    customer_name VARCHAR(255),                          -- Nom du client (display)
+    customer_email VARCHAR(255),
+    email_contact VARCHAR(255),                          -- Email de contact
+    phone_contact VARCHAR(50),                           -- Téléphone de contact
+
+    -- Description
+    description TEXT,
+
+    -- Type & Recovery tracking
+    invoice_type VARCHAR(50) DEFAULT 'issued',           -- issued (you sent it) / received (you got it)
+    recovery_percent DECIMAL(5,2) DEFAULT 0              -- 0-100%, auto-calculated from matches
+        CHECK (recovery_percent >= 0 AND recovery_percent <= 100),
+    status VARCHAR(50) DEFAULT 'unpaid',                 -- unpaid, partial, paid, cancelled, overdue
+
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+
+    CONSTRAINT unique_source_invoice UNIQUE(tenant_id, source_type, source_id)
+);
+
+-- Indexes (complete set)
+CREATE INDEX idx_invoices_tenant ON invoices(tenant_id);
+CREATE INDEX idx_invoices_status ON invoices(tenant_id, status);
+CREATE INDEX idx_invoices_date ON invoices(tenant_id, invoice_date);
+CREATE INDEX idx_invoices_due_date ON invoices(tenant_id, due_date);
+CREATE INDEX idx_invoices_supplier ON invoices(supplier_id);
+CREATE INDEX idx_invoices_client ON invoices(client_id);
+CREATE INDEX idx_invoices_recovery ON invoices(tenant_id, recovery_percent);
+CREATE INDEX idx_invoices_external_ref ON invoices(external_reference);
+CREATE INDEX idx_invoices_type ON invoices(tenant_id, invoice_type);
+-- Composite for matching: find unpaid invoices for a given client/supplier
+CREATE INDEX idx_invoices_matching ON invoices(tenant_id, status, invoice_type, amount_incl_vat);</code></pre>
+
+        <!-- FULL SUPPLIERS TABLE (reference) -->
+        <h3>Full Table: suppliers (unchanged, for reference)</h3>
+        <pre><code>CREATE TABLE suppliers (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255),
+    phone VARCHAR(50),
+    address TEXT,
+    tax_id VARCHAR(100),                                 -- SIRET, VAT number
+    iban VARCHAR(50),
+    bic VARCHAR(11),
+    payment_terms_days INTEGER DEFAULT 30,
+    status VARCHAR(50) DEFAULT 'active',                 -- active, inactive
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);</code></pre>
+
+        <!-- FULL MATCHES TABLE (reference) -->
+        <h3>Full Table: matches (unchanged, for reference)</h3>
+        <pre><code>CREATE TABLE matches (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    transaction_id UUID REFERENCES transactions(id) ON DELETE CASCADE,
+    transaction_type VARCHAR(50) DEFAULT 'bank',          -- bank, crypto
+    crypto_transaction_id UUID REFERENCES crypto_transactions(id) ON DELETE CASCADE,
+    invoice_id UUID REFERENCES invoices(id) ON DELETE CASCADE,
+    matched_amount DECIMAL(15,2),                         -- Supports partial matching
+    match_type VARCHAR(50) NOT NULL,                      -- ai_auto, manual, rule, n8n
+    confidence_score DECIMAL(5,2),                        -- 0.00 to 100.00
+    ai_reasoning TEXT,                                    -- AI explanation
+    matched_by UUID REFERENCES users(id),                 -- NULL if auto
+    status VARCHAR(50) DEFAULT 'active',                  -- active, cancelled
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    CONSTRAINT unique_match UNIQUE(transaction_id, invoice_id)
+);
+
+-- NOTE: The existing trigger update_invoice_recovery() auto-calculates
+-- invoices.recovery_percent when matches are inserted/updated/deleted.
+-- The NEW trigger update_client_payment_analytics() auto-calculates
+-- clients.payment_score and clients.avg_payment_days.</code></pre>
+
+        <!-- RELATIONSHIP SUMMARY -->
+        <h3>Relationship Summary: Clients vs Suppliers</h3>
+        <div class="grid-2">
+            <div class="card card-green">
+                <h4>Clients (NEW) — Those who pay YOU</h4>
+                <pre><code style="font-size:0.85em;">Client
+  └── invoices (invoice_type = 'issued')
+        └── matches
+              └── transactions (incoming payments)
+
+Analytics (auto-calculated):
+  • payment_score: % of invoiced amount paid
+  • avg_payment_days: average delay
+  • total_invoiced / total_paid
+  • last_invoice_date / last_payment_date</code></pre>
+            </div>
+            <div class="card card-blue">
+                <h4>Suppliers (existing) — Those YOU pay</h4>
+                <pre><code style="font-size:0.85em;">Supplier
+  └── invoices (invoice_type = 'received')
+        └── matches
+              └── transactions (outgoing payments)
+
+Existing fields:
+  • name, email, phone, address
+  • tax_id, iban, bic
+  • payment_terms_days</code></pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- SECTION 8: SCALABILITY PLAN                   -->
+    <!-- ============================================ -->
+    <div class="section">
+        <h2>8. Scalability Plan</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Metric</th>
+                    <th>Phase 1<br/>Launch (0-6 mo)</th>
+                    <th>Phase 2<br/>Growth (6-12 mo)</th>
+                    <th>Phase 3<br/>Scale (12-24 mo)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Customers (Orgs)</strong></td>
+                    <td>10-50</td>
+                    <td>50-500</td>
+                    <td>500-2,000+</td>
+                </tr>
+                <tr>
+                    <td><strong>Tenants (Entities)</strong></td>
+                    <td>20-100</td>
+                    <td>100-1,500</td>
+                    <td>1,500-6,000+</td>
+                </tr>
+                <tr>
+                    <td><strong>Transactions/month</strong></td>
+                    <td>1,000-5,000</td>
+                    <td>5,000-50,000</td>
+                    <td>50,000-500,000+</td>
+                </tr>
+                <tr>
+                    <td><strong>AI Matching calls/month</strong></td>
+                    <td>2,000-10,000</td>
+                    <td>10,000-100,000</td>
+                    <td>100,000-1,000,000</td>
+                </tr>
+                <tr>
+                    <td><strong>DB Size</strong></td>
+                    <td>&lt; 1 GB</td>
+                    <td>1-10 GB</td>
+                    <td>10-100 GB</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Scaling Actions by Phase</h3>
+        <div class="grid-3">
+            <div class="card card-green">
+                <h4>Phase 1: Launch</h4>
+                <p style="font-size:0.9em; color: #94a3b8; margin-bottom:10px;">Current architecture is sufficient</p>
+                <ul>
+                    <li>Cloud SQL <code>db-f1-micro</code></li>
+                    <li>API min=1, max=10</li>
+                    <li>Worker min=0, max=5</li>
+                    <li>No Redis needed</li>
+                    <li>Basic monitoring</li>
+                </ul>
+                <span class="badge badge-green">We are here</span>
+            </div>
+            <div class="card card-orange">
+                <h4>Phase 2: Growth</h4>
+                <p style="font-size:0.9em; color: #94a3b8; margin-bottom:10px;">Add caching + DB upgrade</p>
+                <ul>
+                    <li>Cloud SQL <code>db-custom-2-8192</code></li>
+                    <li><strong>Add Memorystore Redis</strong></li>
+                    <li>API max=50, Worker max=20</li>
+                    <li><strong>Add read replica</strong> for reports</li>
+                    <li>DB indexes optimization</li>
+                    <li>Connection pooling (PgBouncer)</li>
+                </ul>
+                <span class="badge badge-orange">6-12 months</span>
+            </div>
+            <div class="card card-pink">
+                <h4>Phase 3: Scale</h4>
+                <p style="font-size:0.9em; color: #94a3b8; margin-bottom:10px;">Partition + multi-region</p>
+                <ul>
+                    <li>Cloud SQL <code>db-custom-4-16384</code></li>
+                    <li><strong>Table partitioning</strong> by tenant_id</li>
+                    <li><strong>Multi-region</strong> (EU + US)</li>
+                    <li>BigQuery for analytics</li>
+                    <li>CDN for API responses</li>
+                    <li>Dedicated AI endpoint</li>
+                </ul>
+                <span class="badge badge-pink">12-24 months</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- SECTION 9: COST ANALYSIS                      -->
+    <!-- ============================================ -->
+    <div class="section">
+        <h2>9. Cost Analysis</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Service</th>
+                    <th>Phase 1<br/>(10-50 customers)</th>
+                    <th>Phase 2<br/>(50-500 customers)</th>
+                    <th>Phase 3<br/>(500-2000 customers)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Cloud SQL PostgreSQL</strong></td>
+                    <td>db-f1-micro: ~15€</td>
+                    <td>db-custom-2-8192: ~120€</td>
+                    <td>db-custom-4-16384 + replica: ~400€</td>
+                </tr>
+                <tr>
+                    <td><strong>Cloud Run (API)</strong></td>
+                    <td>min=1: ~30€</td>
+                    <td>min=2, avg 5: ~80€</td>
+                    <td>min=5, avg 20: ~250€</td>
+                </tr>
+                <tr>
+                    <td><strong>Cloud Run (Worker)</strong></td>
+                    <td>min=0: ~20€</td>
+                    <td>avg 3 instances: ~60€</td>
+                    <td>avg 10 instances: ~200€</td>
+                </tr>
+                <tr>
+                    <td><strong>Pub/Sub</strong></td>
+                    <td>~5€</td>
+                    <td>~15€</td>
+                    <td>~50€</td>
+                </tr>
+                <tr>
+                    <td><strong>Vertex AI (Gemini)</strong></td>
+                    <td>10K calls: ~15€</td>
+                    <td>100K calls: ~80€</td>
+                    <td>1M calls: ~400€</td>
+                </tr>
+                <tr>
+                    <td><strong>Memorystore Redis</strong></td>
+                    <td>Not needed: 0€</td>
+                    <td>Basic 1GB: ~40€</td>
+                    <td>Standard 5GB: ~150€</td>
+                </tr>
+                <tr>
+                    <td><strong>Secret Manager</strong></td>
+                    <td>~1€</td>
+                    <td>~2€</td>
+                    <td>~5€</td>
+                </tr>
+                <tr>
+                    <td><strong>Cloudflare (Free/Pro)</strong></td>
+                    <td>Free: 0€</td>
+                    <td>Pro: ~20€</td>
+                    <td>Business: ~200€</td>
+                </tr>
+                <tr>
+                    <td><strong>Firebase Auth</strong></td>
+                    <td>Free (< 50K users)</td>
+                    <td>Free</td>
+                    <td>Free (< 50K users)</td>
+                </tr>
+                <tr>
+                    <td><strong>Monitoring + Logging</strong></td>
+                    <td>~5€</td>
+                    <td>~20€</td>
+                    <td>~80€</td>
+                </tr>
+                <tr style="background: rgba(59,130,246,0.1);">
+                    <td><strong>TOTAL MONTHLY</strong></td>
+                    <td><strong>~90€/mo</strong></td>
+                    <td><strong>~440€/mo</strong></td>
+                    <td><strong>~1,735€/mo</strong></td>
+                </tr>
+                <tr style="background: rgba(16,185,129,0.1);">
+                    <td><strong>Cost per Customer</strong></td>
+                    <td>~3€/customer</td>
+                    <td>~1€/customer</td>
+                    <td>~0.87€/customer</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="card card-green" style="margin-top:20px;">
+            <h4>Cost Optimization Strategies</h4>
+            <ul>
+                <li><strong>Pre-filtering before AI</strong>: Only send plausible matches to Vertex AI (saves 60-80% of AI costs)</li>
+                <li><strong>Batch AI calls</strong>: Group 10-20 pairs in a single prompt (reduces per-call overhead)</li>
+                <li><strong>Worker scale-to-zero</strong>: No cost when no messages to process</li>
+                <li><strong>Committed Use Discounts</strong>: 30-50% savings on Cloud SQL with 1-year commitment (Phase 2+)</li>
+                <li><strong>Cloudflare caching</strong>: Reduces Cloud Run invocations for static/semi-static data</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- SECTION 10: IMPROVEMENTS OVER V2              -->
+    <!-- ============================================ -->
+    <div class="section">
+        <h2>10. Key Improvements over Architecture v2</h2>
+
+        <div class="grid-2">
+            <div class="card card-green">
+                <h4>Architectural</h4>
+                <ul>
+                    <li class="improvement"><strong>Organization hierarchy</strong>: 3-level model (Org → Tenant → Data) instead of flat tenants</li>
+                    <li class="improvement"><strong>Provider plugin system</strong>: Interface-based integration layer, not hardcoded</li>
+                    <li class="improvement"><strong>Cloudflare DNS proxy</strong>: SSL termination + CDN instead of direct Cloud Run domain mapping</li>
+                    <li class="improvement"><strong>API min=1</strong>: No cold start penalty for users</li>
+                    <li class="improvement"><strong>Higher scale limits</strong>: API max=50, Worker max=20 (was 10/5)</li>
+                    <li class="improvement"><strong>Redis cache path</strong>: Ready to add when latency matters</li>
+                </ul>
+            </div>
+            <div class="card card-blue">
+                <h4>Operational</h4>
+                <ul>
+                    <li class="improvement"><strong>DLQ admin dashboard</strong>: View and retry failed messages from UI</li>
+                    <li class="improvement"><strong>Consolidated reporting</strong>: Org-level cross-tenant reports</li>
+                    <li class="improvement"><strong>Tenant switching</strong>: Users can switch between entities</li>
+                    <li class="improvement"><strong>AI pre-filtering</strong>: Reduces Vertex AI costs by 60-80%</li>
+                    <li class="improvement"><strong>Phased scaling plan</strong>: Clear upgrade path per growth phase</li>
+                    <li class="improvement"><strong>Unified naming</strong>: Everything under Invunion brand</li>
+                </ul>
+            </div>
+            <div class="card card-purple">
+                <h4>Security & Compliance</h4>
+                <ul>
+                    <li class="improvement"><strong>Organization-level RBAC</strong>: Owner → Admin → Member hierarchy</li>
+                    <li class="improvement"><strong>Tenant-level RBAC</strong>: Admin → Editor → Viewer</li>
+                    <li class="improvement"><strong>RLS-ready</strong>: PostgreSQL Row-Level Security policies defined</li>
+                    <li class="improvement"><strong>Audit log</strong>: Every data mutation tracked</li>
+                    <li class="improvement"><strong>Webhook signatures</strong>: All providers verified</li>
+                    <li class="improvement"><strong>Idempotency</strong>: Duplicate detection on all ingest paths</li>
+                </ul>
+            </div>
+            <div class="card card-orange">
+                <h4>Developer Experience</h4>
+                <ul>
+                    <li class="improvement"><strong>MSC diagrams</strong>: 6 sequence charts for all major flows</li>
+                    <li class="improvement"><strong>Provider interface docs</strong>: Clear contract for new integrations</li>
+                    <li class="improvement"><strong>Cost projections</strong>: 3-phase budget with per-customer costs</li>
+                    <li class="improvement"><strong>ER diagram</strong>: Full data model visualization</li>
+                    <li class="improvement"><strong>Naming guide</strong>: Clear old→new reference table</li>
+                    <li class="improvement"><strong>Migration-safe</strong>: Expand/contract DB pattern</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- SECTION 11: TECH STACK SUMMARY                -->
+    <!-- ============================================ -->
+    <div class="section">
+        <h2>11. Technology Stack</h2>
+        <div class="grid-2">
+            <div class="card card-cyan">
+                <h4>Frontend</h4>
+                <table>
+                    <tr><td>Framework</td><td><code>React 18 + TypeScript</code></td></tr>
+                    <tr><td>Build</td><td><code>Vite 5 (SWC)</code></td></tr>
+                    <tr><td>UI</td><td><code>shadcn/ui + Tailwind CSS</code></td></tr>
+                    <tr><td>State</td><td><code>TanStack Query + React Context</code></td></tr>
+                    <tr><td>Forms</td><td><code>React Hook Form + Zod</code></td></tr>
+                    <tr><td>Icons</td><td><code>lucide-react</code></td></tr>
+                    <tr><td>Charts</td><td><code>Recharts</code></td></tr>
+                    <tr><td>i18n</td><td><code>Custom (EN/FR/DE)</code></td></tr>
+                    <tr><td>Hosting</td><td><code>Cloudflare Pages</code></td></tr>
+                    <tr><td>Auth</td><td><code>Firebase Auth (client SDK)</code></td></tr>
+                </table>
+            </div>
+            <div class="card card-blue">
+                <h4>Backend</h4>
+                <table>
+                    <tr><td>Runtime</td><td><code>Node.js 20 (Alpine)</code></td></tr>
+                    <tr><td>Framework</td><td><code>Express 4 + TypeScript</code></td></tr>
+                    <tr><td>Validation</td><td><code>Zod</code></td></tr>
+                    <tr><td>Auth</td><td><code>Firebase Admin SDK</code></td></tr>
+                    <tr><td>Database</td><td><code>pg (node-postgres)</code></td></tr>
+                    <tr><td>Messaging</td><td><code>@google-cloud/pubsub</code></td></tr>
+                    <tr><td>AI</td><td><code>Vertex AI (Gemini 2.0 Flash)</code></td></tr>
+                    <tr><td>Security</td><td><code>Helmet + CORS + Rate Limit</code></td></tr>
+                    <tr><td>Hosting</td><td><code>Cloud Run (GCP)</code></td></tr>
+                    <tr><td>CI/CD</td><td><code>GitHub Actions → Cloud Run</code></td></tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- SECTION 12: MIGRATION CHECKLIST               -->
+    <!-- ============================================ -->
+    <div class="section">
+        <h2>12. Migration Checklist (v2 → v3)</h2>
+        <div class="grid-2">
+            <div class="card">
+                <h4>Database (Priority 1)</h4>
+                <ul style="list-style: none; padding-left: 0;">
+                    <li>☐ Create <code>organizations</code> table</li>
+                    <li>☐ Add <code>organization_id</code> to tenants</li>
+                    <li>☐ Create <code>organization_members</code> table</li>
+                    <li>☐ Create <code>tenant_members</code> table</li>
+                    <li>☐ Create <code>clients</code> table (NEW)</li>
+                    <li>☐ Add <code>client_id</code> to invoices and transactions</li>
+                    <li>☐ Create client analytics trigger</li>
+                    <li>☐ Migrate existing tenants → create default orgs</li>
+                    <li>☐ Add indexes for new tables</li>
+                    <li>☐ Test RLS policies</li>
+                </ul>
+            </div>
+            <div class="card">
+                <h4>Backend API (Priority 1)</h4>
+                <ul style="list-style: none; padding-left: 0;">
+                    <li>☐ Add Organization CRUD routes</li>
+                    <li>☐ Add tenant switching endpoint</li>
+                    <li>☐ Update auth middleware (org context)</li>
+                    <li>☐ Update signup flow (create org + tenant)</li>
+                    <li>☐ Add consolidated reporting</li>
+                    <li>☐ Add DLQ admin endpoints</li>
+                    <li>☐ Rename service to <code>invunion-api</code></li>
+                </ul>
+            </div>
+            <div class="card">
+                <h4>Frontend (Priority 2)</h4>
+                <ul style="list-style: none; padding-left: 0;">
+                    <li>☐ Add org/tenant selector in sidebar</li>
+                    <li>☐ Add tenant switching UI</li>
+                    <li>☐ Add organization settings page</li>
+                    <li>☐ Add invite members flow</li>
+                    <li>☐ Update auth context with org data</li>
+                    <li>☐ Set custom domain: <code>app.invunion.com</code></li>
+                </ul>
+            </div>
+            <div class="card">
+                <h4>Infrastructure (Priority 2)</h4>
+                <ul style="list-style: none; padding-left: 0;">
+                    <li>☐ Rename Cloud Run services</li>
+                    <li>☐ Update GitHub Actions workflows</li>
+                    <li>☐ Update Cloudflare Pages project name</li>
+                    <li>☐ Deploy Worker service</li>
+                    <li>☐ Create Pub/Sub subscriptions</li>
+                    <li>☐ Configure DLQ topics</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- FOOTER                                        -->
+    <!-- ============================================ -->
+    <div style="text-align: center; padding: 40px 20px; color: #475569; font-size: 0.9em;">
+        <p style="margin-bottom: 5px;"><strong>Invunion</strong> - Architecture v3</p>
+        <p>Bank Reconciliation SaaS &bull; Multi-Tenant B2B &bull; API-First &bull; AI-Powered</p>
+        <p style="margin-top: 10px;">Document created: February 6, 2026 &bull; Version 3.0</p>
+    </div>
+</div>
+</body>
+</html>

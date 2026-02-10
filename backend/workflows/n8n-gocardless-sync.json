@@ -1,0 +1,432 @@
+{
+  "name": "GoCardless Bank Sync - 4x Daily",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6,12,18,23 * * *"
+            }
+          ]
+        }
+      },
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "id": "schedule-trigger",
+      "notes": "Déclenche 4x/jour : 6h, 12h, 18h, 23h"
+    },
+    {
+      "parameters": {
+        "url": "={{$env.BACKEND_URL}}/api/v1/banking/accounts-to-sync",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "name": "Get Accounts to Sync",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [450, 300],
+      "id": "get-accounts",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "backend-auth",
+          "name": "Backend API Auth"
+        }
+      },
+      "notes": "Récupère la liste des comptes bancaires à synchroniser"
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "name": "Loop Over Accounts",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [650, 300],
+      "id": "loop-accounts",
+      "notes": "Traite chaque compte un par un"
+    },
+    {
+      "parameters": {
+        "url": "=https://bankaccountdata.gocardless.com/api/v2/accounts/{{$json.accountId}}/transactions/",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "date_from",
+              "value": "={{$json.lastSyncDate || new Date(Date.now() - 30*24*60*60*1000).toISOString().split('T')[0]}}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "name": "Fetch Transactions from GoCardless",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [850, 300],
+      "id": "fetch-transactions",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "gocardless-auth",
+          "name": "GoCardless API Auth"
+        }
+      },
+      "notes": "Récupère les transactions depuis GoCardless"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Transform GoCardless transactions to Invunion format\nconst accountInfo = items[0].json;\nconst gcResponse = items[1].json;\n\nif (!gcResponse.transactions || !gcResponse.transactions.booked) {\n  return [];\n}\n\nconst transactions = gcResponse.transactions.booked.map(tx => {\n  // Détecter la direction (IN/OUT)\n  const amount = parseFloat(tx.transactionAmount.amount);\n  const direction = amount >= 0 ? 'IN' : 'OUT';\n  \n  // Nom de la contrepartie\n  const counterpartyName = direction === 'IN' \n    ? (tx.debtorName || tx.debtorAccount?.iban || 'Unknown')\n    : (tx.creditorName || tx.creditorAccount?.iban || 'Unknown');\n  \n  return {\n    tenantId: accountInfo.tenantId,\n    accountId: accountInfo.accountId,\n    externalId: tx.internalTransactionId || tx.transactionId,\n    bookingDate: tx.bookingDate,\n    valueDate: tx.valueDate || tx.bookingDate,\n    amount: Math.abs(amount),\n    currency: tx.transactionAmount.currency,\n    direction: direction,\n    counterpartyName: counterpartyName,\n    counterpartyIban: direction === 'IN' \n      ? tx.debtorAccount?.iban \n      : tx.creditorAccount?.iban,\n    description: tx.remittanceInformationUnstructured || \n                 tx.remittanceInformationStructured || \n                 tx.additionalInformation || '',\n    bankTransactionCode: tx.bankTransactionCode,\n    rawData: tx,\n    syncedAt: new Date().toISOString()\n  };\n});\n\nconsole.log(`Processed ${transactions.length} transactions for account ${accountInfo.accountId}`);\n\nreturn transactions.map(tx => ({ json: tx }));"
+      },
+      "name": "Transform Transactions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 300],
+      "id": "transform-transactions",
+      "notes": "Transforme les données GoCardless vers format Invunion"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.externalId}}",
+              "operation": "exists"
+            }
+          ]
+        }
+      },
+      "name": "Has Transactions?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1250, 300],
+      "id": "has-transactions",
+      "notes": "Vérifie s'il y a des transactions à envoyer"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll"
+      },
+      "name": "Aggregate Transactions",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [1450, 200],
+      "id": "aggregate-transactions",
+      "notes": "Regroupe toutes les transactions en un seul payload"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Group transactions by account\nconst allTransactions = items.map(item => item.json);\n\nif (allTransactions.length === 0) {\n  return [{ json: { message: 'No transactions to send' } }];\n}\n\nconst tenantId = allTransactions[0].tenantId;\nconst accountId = allTransactions[0].accountId;\n\nreturn [{\n  json: {\n    tenantId: tenantId,\n    accountId: accountId,\n    transactions: allTransactions,\n    count: allTransactions.length,\n    syncedAt: new Date().toISOString()\n  }\n}];"
+      },
+      "name": "Prepare Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1650, 200],
+      "id": "prepare-payload",
+      "notes": "Prépare le payload final pour le backend"
+    },
+    {
+      "parameters": {
+        "url": "={{$env.BACKEND_URL}}/api/v1/ingest/transactions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "name": "Send to Backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1850, 200],
+      "id": "send-to-backend",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "backend-auth",
+          "name": "Backend API Auth"
+        }
+      },
+      "notes": "Envoie les transactions au backend Invunion"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.success}}",
+              "operation": "equals",
+              "value2": "true"
+            }
+          ]
+        }
+      },
+      "name": "Success?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [2050, 200],
+      "id": "check-success"
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = items[0].json;\n\nconsole.log('✅ Success:', {\n  inserted: response.inserted,\n  skipped: response.skipped,\n  accountId: response.accountId\n});\n\nreturn items;"
+      },
+      "name": "Log Success",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2250, 100],
+      "id": "log-success"
+    },
+    {
+      "parameters": {
+        "jsCode": "const error = items[0].json;\n\nconsole.error('❌ Error sending transactions:', error);\n\n// Optionnel : envoyer une alerte (Slack, email, etc.)\n// throw new Error('Transaction sync failed');\n\nreturn items;"
+      },
+      "name": "Log Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2250, 300],
+      "id": "log-error"
+    },
+    {
+      "parameters": {
+        "jsCode": "console.log('⚠️ No transactions found for this account');\nreturn [];"
+      },
+      "name": "No Transactions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1450, 400],
+      "id": "no-transactions"
+    },
+    {
+      "parameters": {},
+      "name": "Continue Loop",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [2450, 200],
+      "id": "continue-loop",
+      "notes": "Retourne à la boucle pour le compte suivant"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Gestion d'erreur GoCardless\nconst error = $input.item.json.error || {};\n\nconsole.error('❌ GoCardless API Error:', {\n  accountId: $('Loop Over Accounts').item.json.accountId,\n  status: error.status_code,\n  message: error.summary || error.detail,\n  type: error.type\n});\n\n// Marquer le compte comme erreur\nreturn [{\n  json: {\n    accountId: $('Loop Over Accounts').item.json.accountId,\n    error: true,\n    errorMessage: error.summary || 'Unknown error',\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "name": "Handle GoCardless Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 500],
+      "id": "handle-gc-error"
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Accounts to Sync",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Accounts to Sync": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Accounts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Accounts": {
+      "main": [
+        [
+          {
+            "node": "Fetch Transactions from GoCardless",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Transactions from GoCardless": {
+      "main": [
+        [
+          {
+            "node": "Transform Transactions",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle GoCardless Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transform Transactions": {
+      "main": [
+        [
+          {
+            "node": "Has Transactions?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Transactions?": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Transactions",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Transactions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Transactions": {
+      "main": [
+        [
+          {
+            "node": "Prepare Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Payload": {
+      "main": [
+        [
+          {
+            "node": "Send to Backend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send to Backend": {
+      "main": [
+        [
+          {
+            "node": "Success?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Success?": {
+      "main": [
+        [
+          {
+            "node": "Log Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Success": {
+      "main": [
+        [
+          {
+            "node": "Continue Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Error": {
+      "main": [
+        [
+          {
+            "node": "Continue Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Continue Loop": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Accounts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle GoCardless Error": {
+      "main": [
+        [
+          {
+            "node": "Continue Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "createdAt": "2026-01-15T10:00:00.000Z",
+      "updatedAt": "2026-01-15T10:00:00.000Z",
+      "id": "1",
+      "name": "Banking"
+    },
+    {
+      "createdAt": "2026-01-15T10:00:00.000Z",
+      "updatedAt": "2026-01-15T10:00:00.000Z",
+      "id": "2",
+      "name": "GoCardless"
+    }
+  ],
+  "pinData": {},
+  "versionId": "1"
+}

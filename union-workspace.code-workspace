@@ -1,0 +1,17 @@
+{
+  "folders": [
+    {
+      "name": "Backend (Union API)",
+      "path": "/Users/francoissuret/union-api/backend"
+    },
+    {
+      "name": "Frontend (Union)",
+      "path": "/Users/francoissuret/union-api/frontend"
+    }
+  ],
+  "settings": {
+    "files.exclude": {
+      "**/node_modules": true
+    }
+  }
+}
