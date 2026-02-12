@@ -58,7 +58,7 @@ jobs:
             --allow-unauthenticated \
             --set-cloudsql-instances ${{ secrets.CLOUD_SQL_CONNECTION_NAME }} \
             --set-env-vars "FIREBASE_PROJECT_ID=${{ env.PROJECT_ID }},NODE_ENV=production,DB_USER=${{ secrets.DB_USER }},DB_NAME=${{ secrets.DB_NAME }},CLOUD_SQL_CONNECTION_NAME=${{ secrets.CLOUD_SQL_CONNECTION_NAME }}" \
-            --set-secrets "DB_PASSWORD=${{ secrets.DB_PASSWORD_SECRET }}"
+            --set-secrets "DB_PASSWORD=${{ secrets.DB_PASSWORD_SECRET }}:latest"
 
       - name: Verify deployment
         run: |
