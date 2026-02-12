@@ -1,8 +1,11 @@
-# Welcome to your Lovable project
+# Invunion Frontend
+
+Modern financial reconciliation platform - React + Vite + shadcn/ui
 
 ## Project info
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+**Production**: https://app.invunion.com (Cloudflare Pages)  
+**API**: https://api.invunion.com
 
 ## How can I edit this code?
 
