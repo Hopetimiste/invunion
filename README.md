@@ -80,6 +80,56 @@ See `backend/docs/architecture-v3.html` for detailed architecture diagrams.
 
 ---
 
+## 📊 Complete Stack Overview
+
+| **Composant** | **Nom/Identifiant** | **Type** | **Région/Location** | **Statut** |
+|---------------|---------------------|----------|---------------------|------------|
+| **GCP PROJECT** | `invunion-prod` | GCP Project | Global | ✅ Actif |
+| **PROJECT NUMBER** | `730177123842` | GCP Project Number | Global | ✅ Actif |
+| **FIREBASE PROJECT** | `invunion-prod` | Firebase Project | Global | ✅ Actif |
+| | | | | |
+| **DATABASE** | | | | |
+| Cloud SQL Instance | `invunion-db` | PostgreSQL 15 | `europe-west1` | ✅ RUNNABLE |
+| Database Name | `invunion_db` | Database | - | ✅ Actif |
+| DB User | `invunion` | PostgreSQL User | - | ✅ Actif |
+| Connection String | `invunion-prod:europe-west1:invunion-db` | Cloud SQL Connection | - | ✅ Actif |
+| | | | | |
+| **BACKEND API** | | | | |
+| Cloud Run Service | `invunion-api` | Cloud Run Service | `europe-west1` | ✅ Déployé |
+| API Domain | `api.invunion.com` | Custom Domain | Global | ✅ SSL Actif |
+| Artifact Registry | `invunion-registry` | Docker Registry | `europe-west1` | ✅ Actif |
+| Docker Image | `europe-west1-docker.pkg.dev/invunion-prod/invunion-registry/invunion-api` | Container Image | - | ✅ Actif |
+| | | | | |
+| **FRONTEND** | | | | |
+| Project Name | `invunion-frontend` | React + Vite | - | ✅ Actif |
+| Hosting | Cloudflare Pages | Static Hosting | Global | ✅ Déployé |
+| Domain | `app.invunion.com` | Custom Domain | Global | ✅ SSL Actif |
+| | | | | |
+| **AUTHENTICATION** | | | | |
+| Firebase Auth | `invunion-prod` | Firebase Auth | Global | ✅ Actif |
+| Firebase App ID | `1:730177123842:web:853301ffd9fe2cb02fd91b` | Web App | - | ✅ Actif |
+| Auth Domain | `invunion-prod.firebaseapp.com` | Firebase Domain | Global | ✅ Actif |
+| Storage Bucket | `invunion-prod.firebasestorage.app` | Firebase Storage | Global | ✅ Actif |
+| | | | | |
+| **SECRETS & IAM** | | | | |
+| Secret Manager | `DB_PASSWORD` | Secret | Global | ✅ Actif |
+| Workload Identity Pool | `github-pool` | WIF Pool | Global | ✅ Configuré |
+| WIF Provider | `github-provider` | WIF Provider | Global | ✅ Configuré |
+| Service Account | `github-actions@invunion-prod.iam.gserviceaccount.com` | Service Account | Global | ✅ Actif |
+| | | | | |
+| **CI/CD** | | | | |
+| Backend Workflow | `backend-deploy.yml` | GitHub Actions | - | ✅ Actif |
+| Frontend Workflow | `frontend-deploy.yml` | GitHub Actions | - | ✅ Actif |
+| GitHub Repo | `Hopetimiste/invunion` | Git Repository | - | ✅ Actif |
+| | | | | |
+| **INTÉGRATIONS** | | | | |
+| Banking Provider | Tink (PSD2) | API Integration | Europe | ⏳ Configuré |
+| Banking Provider | GoCardless | API Integration | Europe | ⏳ Configuré |
+| Workflow Engine | n8n | Automation | - | ⏳ Configuré |
+| AI (prévu) | Vertex AI (Gemini) | AI/ML | `europe-west1` | ⏳ À implémenter |
+
+---
+
 ## 📚 Documentation
 
 - **Architecture**: `backend/docs/architecture-v3.html`
@@ -195,10 +245,10 @@ Proprietary - All rights reserved
 ## 🔗 Links
 
 - **Production API**: https://api.invunion.com
-- **Production App**: https://app.invunion.com (coming soon)
+- **Production App**: https://app.invunion.com
 - **GCP Console**: https://console.cloud.google.com/home/dashboard?project=invunion-prod
 - **Firebase Console**: https://console.firebase.google.com/project/invunion-prod
 
 ---
 
-**Last Updated**: 10 February 2026
+**Last Updated**: 12 February 2026
