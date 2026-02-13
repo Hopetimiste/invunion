@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Architecture v4 - Schema Base de Donnees - Invunion</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({ 
+            startOnLoad: true, 
+            theme: 'default',
+            er: { useMaxWidth: true, layoutDirection: 'TB' },
+            flowchart: { useMaxWidth: true, htmlLabels: true }
+        });
+    </script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #e2e8f0;
+            line-height: 1.7;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .header {
+            text-align: center;
+            padding: 40px 20px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 20px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255,255,255,0.08);
+            position: relative;
+        }
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899, #10b981);
+        }
+        h1 {
+            font-size: 2.5em;
+            background: linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+        }
+        .subtitle { color: #94a3b8; font-size: 1.1em; }
+        .section {
+            background: rgba(255,255,255,0.03);
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 25px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        h2 {
+            color: #3b82f6;
+            font-size: 1.6em;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid rgba(59,130,246,0.3);
+        }
+        h3 { color: #8b5cf6; font-size: 1.3em; margin: 25px 0 15px 0; }
+        h4 { color: #ec4899; font-size: 1.1em; margin: 20px 0 10px 0; }
+        .badge {
+            display: inline-block; padding: 4px 12px; border-radius: 20px;
+            font-size: 0.8em; font-weight: 600; margin-right: 8px;
+        }
+        .badge-new { background: rgba(16,185,129,0.25); color: #34d399; border: 1px solid rgba(16,185,129,0.4); }
+        .badge-changed { background: rgba(245,158,11,0.25); color: #fbbf24; border: 1px solid rgba(245,158,11,0.4); }
+        .badge-removed { background: rgba(239,68,68,0.25); color: #f87171; border: 1px solid rgba(239,68,68,0.4); }
+        .badge-kept { background: rgba(59,130,246,0.2); color: #60a5fa; }
+        .badge-count { background: rgba(139,92,246,0.25); color: #a78bfa; font-size: 1.2em; padding: 6px 18px; }
+        .mermaid {
+            background: #ffffff;
+            padding: 30px;
+            border-radius: 12px;
+            margin: 20px 0;
+            overflow-x: auto;
+        }
+        table {
+            width: 100%; border-collapse: collapse; margin: 15px 0;
+            background: rgba(0,0,0,0.2); border-radius: 8px; overflow: hidden;
+        }
+        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.06); }
+        th { background: rgba(59,130,246,0.15); color: #60a5fa; font-weight: 600; font-size: 0.9em; }
+        tr:hover { background: rgba(255,255,255,0.03); }
+        td:first-child { font-family: 'Courier New', monospace; color: #a78bfa; font-size: 0.95em; }
+        .type-col { color: #94a3b8; font-size: 0.9em; }
+        .note-col { color: #cbd5e1; font-size: 0.9em; }
+        .pk { color: #f59e0b; font-weight: 600; }
+        .fk { color: #3b82f6; }
+        .new-field { background: rgba(16,185,129,0.08); }
+        .removed-field { background: rgba(239,68,68,0.08); text-decoration: line-through; color: #f87171; }
+        code {
+            background: rgba(139,92,246,0.15); padding: 2px 8px; border-radius: 4px;
+            font-family: 'Courier New', monospace; font-size: 0.9em; color: #a78bfa;
+        }
+        pre {
+            background: #0d1117; padding: 20px; border-radius: 8px;
+            overflow-x: auto; margin: 15px 0; border: 1px solid #30363d;
+        }
+        pre code { background: none; padding: 0; color: #c9d1d9; }
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+        }
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        .card {
+            background: rgba(0,0,0,0.2);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .card-green { border-left: 4px solid #10b981; }
+        .card-blue { border-left: 4px solid #3b82f6; }
+        .card-red { border-left: 4px solid #ef4444; }
+        .card-orange { border-left: 4px solid #f59e0b; }
+        .card-purple { border-left: 4px solid #8b5cf6; }
+        .stats-row {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin: 25px 0;
+        }
+        .stat {
+            background: rgba(0,0,0,0.3);
+            border-radius: 12px;
+            padding: 20px 30px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.1);
+            min-width: 140px;
+        }
+        .stat-number {
+            font-size: 2.5em; font-weight: 700;
+            background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .stat-label { color: #94a3b8; font-size: 0.9em; margin-top: 5px; }
+        .diff-add { color: #34d399; }
+        .diff-remove { color: #f87171; text-decoration: line-through; }
+        .table-card {
+            background: rgba(0,0,0,0.25);
+            border-radius: 12px;
+            padding: 25px;
+            margin: 20px 0;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .table-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .table-card-name {
+            font-size: 1.3em;
+            font-weight: 700;
+            color: #e2e8f0;
+        }
+        .table-card-desc {
+            color: #94a3b8;
+            margin-bottom: 15px;
+            font-size: 0.95em;
+        }
+        .warn-box {
+            margin-top: 10px; padding: 12px;
+            background: rgba(245,158,11,0.1);
+            border-radius: 8px;
+            border: 1px solid rgba(245,158,11,0.2);
+        }
+        .unique-box {
+            margin-top: 10px; color: #94a3b8; font-size: 0.9em;
+        }
+        @media (max-width: 768px) {
+            .grid-2, .grid-3 { grid-template-columns: 1fr; }
+            .stats-row { flex-direction: column; align-items: center; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- ============================================ -->
+    <!-- HEADER                                        -->
+    <!-- ============================================ -->
+    <div class="header">
+        <h1>Invunion - Architecture v4</h1>
+        <p class="subtitle">Schema Base de Donnees - Version Finale</p>
+        <div style="margin-top: 15px;">
+            <span class="badge badge-count">13 Tables</span>
+            <span class="badge badge-new">+2 nouvelles</span>
+            <span class="badge badge-removed">-6 supprimees</span>
+            <span class="badge badge-changed">3 modifiees</span>
+        </div>
+        <p style="margin-top: 12px; color: #64748b; font-size: 0.9em;">
+            13 fevrier 2026 &bull; Optimise pour matching IA &bull; Analyse de donnees &bull; Comptabilite
+        </p>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- CHANGELOG                                     -->
+    <!-- ============================================ -->
+    <div class="section">
+        <h2>📋 Changements v3 → v4</h2>
+        <div class="grid-3">
+            <div class="card card-red">
+                <h4>Tables SUPPRIMEES (6)</h4>
+                <ul style="list-style: none; padding: 0;">
+                    <li style="padding: 6px 0;"><span class="diff-remove">organization_members</span> — fusionne dans users</li>
+                    <li style="padding: 6px 0;"><span class="diff-remove">clients</span> — fusionne dans counterparties</li>
+                    <li style="padding: 6px 0;"><span class="diff-remove">suppliers</span> — fusionne dans counterparties</li>
+                    <li style="padding: 6px 0;"><span class="diff-remove">bank_connections</span> — fusionne dans provider_connections</li>
+                    <li style="padding: 6px 0;"><span class="diff-remove">invoice_providers</span> — fusionne dans provider_connections</li>
+                    <li style="padding: 6px 0;"><span class="diff-remove">alerts</span> — computable on-the-fly</li>
+                    <li style="padding: 6px 0;"><span class="diff-remove">reports</span> — queries temps reel + Redis Phase 2</li>
+                </ul>
+            </div>
+            <div class="card card-green">
+                <h4>Tables NOUVELLES (2)</h4>
+                <ul style="list-style: none; padding: 0;">
+                    <li style="padding: 6px 0;"><span class="diff-add">counterparties</span> — clients + suppliers unifies</li>
+                    <li style="padding: 6px 0;"><span class="diff-add">provider_connections</span> — bank_connections + invoice_providers unifies</li>
+                </ul>
+                <h4 style="margin-top: 15px;">Tables MODIFIEES (3)</h4>
+                <ul style="list-style: none; padding: 0;">
+                    <li style="padding: 6px 0;">users — +organization_id, +org_role</li>
+                    <li style="padding: 6px 0;">transactions — +counterparty_id, +champs comptables/IA</li>
+                    <li style="padding: 6px 0;">invoices — +counterparty_id, +champs comptables</li>
+                </ul>
+            </div>
+            <div class="card card-blue">
+                <h4>Tables INCHANGEES (8)</h4>
+                <ul style="list-style: none; padding: 0;">
+                    <li style="padding: 6px 0;">organizations</li>
+                    <li style="padding: 6px 0;">tenants</li>
+                    <li style="padding: 6px 0;">tenant_members</li>
+                    <li style="padding: 6px 0;">bank_accounts</li>
+                    <li style="padding: 6px 0;">crypto_transactions</li>
+                    <li style="padding: 6px 0;">matches</li>
+                    <li style="padding: 6px 0;">import_jobs</li>
+                    <li style="padding: 6px 0;">webhook_events</li>
+                    <li style="padding: 6px 0;">audit_log</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="stats-row">
+            <div class="stat">
+                <div class="stat-number">19→13</div>
+                <div class="stat-label">Tables</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number">-32%</div>
+                <div class="stat-label">Complexite</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number">1 FK</div>
+                <div class="stat-label">au lieu de 2 (counterparty)</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number">1 JOIN</div>
+                <div class="stat-label">au lieu de 3 (permissions)</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- ERD DIAGRAM                                   -->
+    <!-- ============================================ -->
+    <div class="section">
+        <h2>🗂️ Diagramme Entity-Relationship</h2>
+        <div class="mermaid">
+erDiagram
+    organizations ||--o{ tenants : "has many"
+    users }o--|| organizations : "belongs to"
+    users ||--o{ tenant_members : "member of"
+    tenants ||--o{ tenant_members : "has many"
+    tenants ||--o{ counterparties : "has many"
+    tenants ||--o{ provider_connections : "has many"
+    tenants ||--o{ bank_accounts : "owns"
+    tenants ||--o{ transactions : "has many"
+    tenants ||--o{ invoices : "has many"
+    tenants ||--o{ matches : "has many"
+    tenants ||--o{ import_jobs : "has many"
+    tenants ||--o{ crypto_transactions : "has many"
+    provider_connections ||--o{ bank_accounts : "has many"
+    bank_accounts ||--o{ transactions : "source of"
+    counterparties ||--o{ transactions : "linked to"
+    counterparties ||--o{ invoices : "linked to"
+    provider_connections ||--o{ invoices : "synced from"
+    transactions ||--o{ matches : "matched in"
+    invoices ||--o{ matches : "matched in"
+    crypto_transactions ||--o{ matches : "matched in"
+    users ||--o{ matches : "created by"
+
+    organizations {
+        uuid id PK
+        string name
+        string slug UK
+        string plan
+        string billing_email
+        int max_tenants
+        int max_users
+        jsonb settings
+        string status
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    tenants {
+        uuid id PK
+        uuid organization_id FK
+        string name
+        string legal_name
+        string tax_id
+        string country
+        string timezone
+        string plan
+        string status
+        jsonb metadata
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    users {
+        uuid id PK
+        uuid organization_id FK
+        string firebase_uid UK
+        string email
+        string first_name
+        string last_name
+        string org_role
+        jsonb metadata
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    tenant_members {
+        uuid id PK
+        uuid tenant_id FK
+        uuid user_id FK
+        string role
+        timestamptz created_at
+    }
+
+    counterparties {
+        uuid id PK
+        uuid tenant_id FK
+        string type
+        string name
+        string legal_name
+        string vat_number
+        string category
+        string external_organization_id
+        string external_entity_id
+        string external_service_id
+        text address
+        string city
+        string postal_code
+        string country
+        jsonb emails
+        string phone
+        string external_reference
+        string internal_reference
+        int payment_terms_days
+        string iban
+        jsonb ledger_accounts
+        string analytic_1
+        string analytic_2
+        decimal payment_score
+        int avg_payment_days
+        decimal total_invoiced
+        decimal total_paid
+        int invoice_count
+        string status
+    }
+
+    provider_connections {
+        uuid id PK
+        uuid tenant_id FK
+        uuid user_id FK
+        string category
+        string provider
+        string provider_connection_id
+        string provider_user_id
+        string api_key_ref
+        string webhook_secret_ref
+        string status
+        timestamptz access_expires_at
+        timestamptz last_sync_at
+        text last_sync_error
+        jsonb metadata
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    bank_accounts {
+        uuid id PK
+        uuid connection_id FK
+        uuid tenant_id FK
+        string provider
+        string provider_account_id
+        string name
+        string iban
+        string bic
+        string currency
+        string account_type
+        decimal balance
+        string bank_name
+        string status
+    }
+
+    transactions {
+        uuid id PK
+        uuid tenant_id FK
+        uuid account_id FK
+        uuid counterparty_id FK
+        string source_type
+        string source_id UK
+        decimal amount
+        string currency
+        date transaction_date
+        string payment_method
+        string remittance_info
+        string structured_reference
+        text description_original
+        string counterparty_name
+        string counterparty_name_normalized
+        string counterparty_iban
+        string ledger_account
+        string analytic_1
+        string analytic_2
+        string status
+    }
+
+    invoices {
+        uuid id PK
+        uuid tenant_id FK
+        uuid provider_connection_id FK
+        uuid counterparty_id FK
+        string source_type
+        string source_id UK
+        jsonb source_raw
+        string invoice_number
+        string external_reference
+        date invoice_date
+        date due_date
+        date payment_expected_date
+        decimal amount_excl_vat
+        decimal vat_amount
+        decimal amount_incl_vat
+        string currency
+        string payment_method
+        string recipient_name
+        string customer_name
+        string customer_email
+        string email_contact
+        string phone_contact
+        text description
+        string invoice_type
+        decimal recovery_percent
+        string ledger_account
+        string analytic_1
+        string analytic_2
+        string status
+        jsonb metadata
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    matches {
+        uuid id PK
+        uuid tenant_id FK
+        uuid transaction_id FK
+        uuid invoice_id FK
+        decimal matched_amount
+        string match_type
+        decimal confidence_score
+        text ai_reasoning
+        uuid matched_by FK
+        string status
+    }
+
+    crypto_transactions {
+        uuid id PK
+        uuid tenant_id FK
+        string wallet_address
+        string chain
+        string provider
+        string tx_hash UK
+        decimal amount
+        string token_symbol
+        string token_address
+        string from_address
+        string to_address
+        timestamptz transaction_date
+        decimal gas_used
+        decimal gas_price
+        string status
+        jsonb raw_data
+        jsonb metadata
+        timestamptz created_at
+    }
+
+    import_jobs {
+        uuid id PK
+        uuid tenant_id FK
+        uuid user_id FK
+        string file_name
+        string file_type
+        string file_format
+        int total_rows
+        int processed_rows
+        int error_rows
+        jsonb errors
+        string status
+        timestamptz started_at
+        timestamptz completed_at
+        jsonb metadata
+        timestamptz created_at
+    }
+
+    webhook_events {
+        uuid id PK
+        string event_id UK
+        string provider
+        timestamptz received_at
+        boolean processed
+        jsonb payload
+        jsonb metadata
+    }
+
+    audit_log {
+        bigserial id PK
+        uuid tenant_id
+        uuid user_id
+        string action
+        string resource_type
+        uuid resource_id
+        jsonb old_values
+        jsonb new_values
+        inet ip_address
+        jsonb metadata
+        timestamptz created_at
+    }
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- TABLE DETAILS                                 -->
+    <!-- ============================================ -->
+    <div class="section">
+        <h2>📊 Detail de chaque table</h2>
+
+        <!-- ORGANIZATIONS -->
+        <div class="table-card">
+            <div class="table-card-header">
+                <span class="table-card-name">🏢 organizations</span>
+                <span class="badge badge-kept">Inchangee</span>
+            </div>
+            <div class="table-card-desc">Organisation mere. Regroupe plusieurs tenants/entites legales.</div>
+            <table>
+                <thead><tr><th>Champ</th><th>Type</th><th>Contrainte</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td>id</td><td class="type-col">UUID</td><td class="pk">PK</td><td class="note-col"></td></tr>
+                    <tr><td>name</td><td class="type-col">VARCHAR(255)</td><td>NOT NULL</td><td class="note-col">Nom de l'organisation</td></tr>
+                    <tr><td>slug</td><td class="type-col">VARCHAR(100)</td><td>UNIQUE</td><td class="note-col">Identifiant URL-friendly</td></tr>
+                    <tr><td>plan</td><td class="type-col">VARCHAR(50)</td><td>DEFAULT 'starter'</td><td class="note-col">starter / pro / enterprise</td></tr>
+                    <tr><td>billing_email</td><td class="type-col">VARCHAR(255)</td><td></td><td class="note-col">Email de facturation</td></tr>
+                    <tr><td>max_tenants</td><td class="type-col">INTEGER</td><td>DEFAULT 3</td><td class="note-col">Limite par plan</td></tr>
+                    <tr><td>max_users</td><td class="type-col">INTEGER</td><td>DEFAULT 10</td><td class="note-col">Limite par plan</td></tr>
+                    <tr><td>settings</td><td class="type-col">JSONB</td><td>DEFAULT '{}'</td><td class="note-col">Devise, timezone, langue par defaut</td></tr>
+                    <tr><td>status</td><td class="type-col">VARCHAR(20)</td><td>DEFAULT 'active'</td><td class="note-col">active / suspended / cancelled</td></tr>
+                    <tr><td>created_at</td><td class="type-col">TIMESTAMPTZ</td><td>DEFAULT NOW()</td><td class="note-col"></td></tr>
+                    <tr><td>updated_at</td><td class="type-col">TIMESTAMPTZ</td><td>DEFAULT NOW()</td><td class="note-col"></td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- TENANTS -->
+        <div class="table-card">
+            <div class="table-card-header">
+                <span class="table-card-name">🏭 tenants</span>
+                <span class="badge badge-changed">Modifiee (v3)</span>
+            </div>
+            <div class="table-card-desc">Entites legales / filiales. Chaque tenant a ses propres donnees isolees.</div>
+            <table>
+                <thead><tr><th>Champ</th><th>Type</th><th>Contrainte</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td>id</td><td class="type-col">UUID</td><td class="pk">PK</td><td class="note-col"></td></tr>
+                    <tr class="new-field"><td>organization_id</td><td class="type-col">UUID</td><td class="fk">FK → organizations</td><td class="note-col">NOUVEAU v3</td></tr>
+                    <tr><td>name</td><td class="type-col">VARCHAR(255)</td><td>NOT NULL</td><td class="note-col">Nom du tenant</td></tr>
+                    <tr class="new-field"><td>legal_name</td><td class="type-col">VARCHAR(255)</td><td></td><td class="note-col">NOUVEAU — Raison sociale</td></tr>
+                    <tr class="new-field"><td>tax_id</td><td class="type-col">VARCHAR(50)</td><td></td><td class="note-col">NOUVEAU — SIRET / VAT</td></tr>
+                    <tr class="new-field"><td>country</td><td class="type-col">VARCHAR(2)</td><td></td><td class="note-col">NOUVEAU — ISO 3166</td></tr>
+                    <tr class="new-field"><td>timezone</td><td class="type-col">VARCHAR(50)</td><td>DEFAULT 'Europe/Paris'</td><td class="note-col">NOUVEAU</td></tr>
+                    <tr><td>plan</td><td class="type-col">VARCHAR(50)</td><td>DEFAULT 'starter'</td><td class="note-col">starter / pro / business</td></tr>
+                    <tr><td>status</td><td class="type-col">VARCHAR(50)</td><td>DEFAULT 'active'</td><td class="note-col">active / suspended / cancelled</td></tr>
+                    <tr><td>metadata</td><td class="type-col">JSONB</td><td>DEFAULT '{}'</td><td class="note-col"></td></tr>
+                    <tr><td>created_at</td><td class="type-col">TIMESTAMPTZ</td><td>DEFAULT NOW()</td><td class="note-col"></td></tr>
+                    <tr><td>updated_at</td><td class="type-col">TIMESTAMPTZ</td><td>DEFAULT NOW()</td><td class="note-col"></td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- USERS -->
+        <div class="table-card">
+            <div class="table-card-header">
+                <span class="table-card-name">👤 users</span>
+                <span class="badge badge-changed">Modifiee (v4)</span>
+            </div>
+            <div class="table-card-desc">Utilisateurs. Absorbe organization_members : chaque user appartient a 1 org directement.</div>
+            <table>
+                <thead><tr><th>Champ</th><th>Type</th><th>Contrainte</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td>id</td><td class="type-col">UUID</td><td class="pk">PK</td><td class="note-col"></td></tr>
+                    <tr class="new-field"><td>organization_id</td><td class="type-col">UUID</td><td class="fk">FK → organizations</td><td class="note-col">NOUVEAU v4 — remplace organization_members</td></tr>
+                    <tr><td>firebase_uid</td><td class="type-col">VARCHAR(255)</td><td>UNIQUE NOT NULL</td><td class="note-col">UID Firebase Auth</td></tr>
+                    <tr><td>email</td><td class="type-col">VARCHAR(255)</td><td>NOT NULL</td><td class="note-col"></td></tr>
+                    <tr><td>first_name</td><td class="type-col">VARCHAR(100)</td><td></td><td class="note-col"></td></tr>
+                    <tr><td>last_name</td><td class="type-col">VARCHAR(100)</td><td></td><td class="note-col"></td></tr>
+                    <tr class="new-field"><td>org_role</td><td class="type-col">VARCHAR(50)</td><td>DEFAULT 'member'</td><td class="note-col">NOUVEAU v4 — owner / admin / member</td></tr>
+                    <tr><td>metadata</td><td class="type-col">JSONB</td><td>DEFAULT '{}'</td><td class="note-col"></td></tr>
+                    <tr><td>created_at</td><td class="type-col">TIMESTAMPTZ</td><td>DEFAULT NOW()</td><td class="note-col"></td></tr>
+                    <tr><td>updated_at</td><td class="type-col">TIMESTAMPTZ</td><td>DEFAULT NOW()</td><td class="note-col"></td></tr>
+                </tbody>
+            </table>
+            <div class="warn-box">
+                <strong style="color: #fbbf24;">Champs supprimes :</strong> <code>tenant_id</code> et <code>role</code> (legacy) — remplaces par <code>organization_id</code> + <code>org_role</code> + <code>tenant_members</code>
+            </div>
+        </div>
+
+        <!-- TENANT_MEMBERS -->
+        <div class="table-card">
+            <div class="table-card-header">
+                <span class="table-card-name">👥 tenant_members</span>
+                <span class="badge badge-kept">Inchangee</span>
+            </div>
+            <div class="table-card-desc">Acces utilisateur aux tenants. Un user peut avoir differents roles par tenant.</div>
+            <table>
+                <thead><tr><th>Champ</th><th>Type</th><th>Contrainte</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td>id</td><td class="type-col">UUID</td><td class="pk">PK</td><td class="note-col"></td></tr>
+                    <tr><td>tenant_id</td><td class="type-col">UUID</td><td class="fk">FK → tenants CASCADE</td><td class="note-col"></td></tr>
+                    <tr><td>user_id</td><td class="type-col">UUID</td><td class="fk">FK → users CASCADE</td><td class="note-col"></td></tr>
+                    <tr><td>role</td><td class="type-col">VARCHAR(50)</td><td>DEFAULT 'viewer'</td><td class="note-col">admin / editor / viewer</td></tr>
+                    <tr><td>created_at</td><td class="type-col">TIMESTAMPTZ</td><td>DEFAULT NOW()</td><td class="note-col"></td></tr>
+                </tbody>
+            </table>
+            <div class="unique-box">UNIQUE(tenant_id, user_id)</div>
+        </div>
+
+        <!-- COUNTERPARTIES -->
+        <div class="table-card" style="border: 2px solid rgba(16,185,129,0.4);">
+            <div class="table-card-header">
+                <span class="table-card-name">🏪 counterparties</span>
+                <span class="badge badge-new">NOUVELLE v4 — remplace clients + suppliers</span>
+            </div>
+            <div class="table-card-desc">
+                Tiers commerciaux unifies. Une meme entite peut etre client ET fournisseur (type = 'both').
+            </div>
+            <table>
+                <thead><tr><th>Champ</th><th>Type</th><th>Contrainte</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td>id</td><td class="type-col">UUID</td><td class="pk">PK</td><td class="note-col"></td></tr>
+                    <tr><td>tenant_id</td><td class="type-col">UUID</td><td class="fk">FK → tenants CASCADE</td><td class="note-col">Isolation multi-tenant</td></tr>
+                    <tr><td colspan="4" style="background: rgba(139,92,246,0.1); color: #a78bfa; font-weight: 600; padding: 8px 15px;">TYPE</td></tr>
+                    <tr><td>type</td><td class="type-col">VARCHAR(50)</td><td>NOT NULL DEFAULT 'supplier'</td><td class="note-col">client / supplier / both</td></tr>
+                    <tr><td colspan="4" style="background: rgba(139,92,246,0.1); color: #a78bfa; font-weight: 600; padding: 8px 15px;">IDENTITE</td></tr>
+                    <tr><td>name</td><td class="type-col">VARCHAR(255)</td><td>NOT NULL</td><td class="note-col">Nom commercial / raison sociale</td></tr>
+                    <tr><td>legal_name</td><td class="type-col">VARCHAR(255)</td><td></td><td class="note-col">Raison sociale legale</td></tr>
+                    <tr><td>vat_number</td><td class="type-col">VARCHAR(50)</td><td></td><td class="note-col">Numero de TVA</td></tr>
+                    <tr><td>category</td><td class="type-col">VARCHAR(50)</td><td>DEFAULT 'professional'</td><td class="note-col">individual / professional / governmental</td></tr>
+                    <tr><td colspan="4" style="background: rgba(139,92,246,0.1); color: #a78bfa; font-weight: 600; padding: 8px 15px;">IDENTIFIANTS EXTERNES (IDs du tiers)</td></tr>
+                    <tr><td>external_organization_id</td><td class="type-col">VARCHAR(255)</td><td></td><td class="note-col">SIREN, group ID du tiers</td></tr>
+                    <tr><td>external_entity_id</td><td class="type-col">VARCHAR(255)</td><td></td><td class="note-col">SIRET, branch ID du tiers</td></tr>
+                    <tr><td>external_service_id</td><td class="type-col">VARCHAR(255)</td><td></td><td class="note-col">Departement/service du tiers</td></tr>
+                    <tr><td colspan="4" style="background: rgba(139,92,246,0.1); color: #a78bfa; font-weight: 600; padding: 8px 15px;">ADRESSE</td></tr>
+                    <tr><td>address</td><td class="type-col">TEXT</td><td></td><td class="note-col">Rue</td></tr>
+                    <tr><td>city</td><td class="type-col">VARCHAR(255)</td><td></td><td class="note-col">Ville</td></tr>
+                    <tr><td>postal_code</td><td class="type-col">VARCHAR(20)</td><td></td><td class="note-col">Code postal</td></tr>
+                    <tr><td>country</td><td class="type-col">VARCHAR(2)</td><td></td><td class="note-col">ISO 3166 alpha-2</td></tr>
+                    <tr><td colspan="4" style="background: rgba(139,92,246,0.1); color: #a78bfa; font-weight: 600; padding: 8px 15px;">CONTACTS</td></tr>
+                    <tr><td>emails</td><td class="type-col">JSONB</td><td>DEFAULT '[]'</td><td class="note-col">[{"email":"a@b.com","label":"comptabilite"}, ...]</td></tr>
+                    <tr><td>phone</td><td class="type-col">VARCHAR(50)</td><td></td><td class="note-col">Telephone principal</td></tr>
+                    <tr><td colspan="4" style="background: rgba(139,92,246,0.1); color: #a78bfa; font-weight: 600; padding: 8px 15px;">REFERENCES</td></tr>
+                    <tr><td>external_reference</td><td class="type-col">VARCHAR(255)</td><td></td><td class="note-col">Reference dans le systeme du tiers</td></tr>
+                    <tr><td>internal_reference</td><td class="type-col">VARCHAR(255)</td><td></td><td class="note-col">Votre reference interne</td></tr>
+                    <tr><td colspan="4" style="background: rgba(139,92,246,0.1); color: #a78bfa; font-weight: 600; padding: 8px 15px;">PAIEMENT</td></tr>
+                    <tr><td>payment_terms_days</td><td class="type-col">INTEGER</td><td>DEFAULT 30</td><td class="note-col">Delai de paiement en jours</td></tr>
+                    <tr><td>iban</td><td class="type-col">VARCHAR(50)</td><td></td><td class="note-col">IBAN pour virements</td></tr>
+                    <tr><td colspan="4" style="background: rgba(139,92,246,0.1); color: #a78bfa; font-weight: 600; padding: 8px 15px;">COMPTABILITE</td></tr>
+                    <tr><td>ledger_accounts</td><td class="type-col">JSONB</td><td>DEFAULT '[]'</td><td class="note-col">[{"code":"401000","label":"Fournisseur X"}, ...]</td></tr>
+                    <tr><td>analytic_1</td><td class="type-col">VARCHAR(100)</td><td></td><td class="note-col">Axe analytique 1</td></tr>
+                    <tr><td>analytic_2</td><td class="type-col">VARCHAR(100)</td><td></td><td class="note-col">Axe analytique 2</td></tr>
+                    <tr><td colspan="4" style="background: rgba(139,92,246,0.1); color: #a78bfa; font-weight: 600; padding: 8px 15px;">ANALYTICS CLIENT (auto-calcules quand type = 'client' ou 'both')</td></tr>
+                    <tr><td>payment_score</td><td class="type-col">DECIMAL(5,2)</td><td>DEFAULT 0, CHECK 0-100</td><td class="note-col">Score de paiement (auto-calcule)</td></tr>
+                    <tr><td>avg_payment_days</td><td class="type-col">INTEGER</td><td>DEFAULT 0</td><td class="note-col">Delai moyen de paiement (auto-calcule)</td></tr>
+                    <tr><td>total_invoiced</td><td class="type-col">DECIMAL(15,2)</td><td>DEFAULT 0</td><td class="note-col">Total facture (auto-calcule)</td></tr>
+                    <tr><td>total_paid</td><td class="type-col">DECIMAL(15,2)</td><td>DEFAULT 0</td><td class="note-col">Total paye (auto-calcule)</td></tr>
+                    <tr><td>last_invoice_date</td><td class="type-col">DATE</td><td></td><td class="note-col">Derniere facture (auto-calcule)</td></tr>
+                    <tr><td>last_payment_date</td><td class="type-col">DATE</td><td></td><td class="note-col">Dernier paiement (auto-calcule)</td></tr>
+                    <tr><td>invoice_count</td><td class="type-col">INTEGER</td><td>DEFAULT 0</td><td class="note-col">Nombre de factures (auto-calcule)</td></tr>
+                    <tr><td colspan="4" style="background: rgba(139,92,246,0.1); color: #a78bfa; font-weight: 600; padding: 8px 15px;">STATUT & META</td></tr>
+                    <tr><td>status</td><td class="type-col">VARCHAR(50)</td><td>DEFAULT 'active'</td><td class="note-col">active / inactive / blocked / prospect</td></tr>
+                    <tr><td>metadata</td><td class="type-col">JSONB</td><td>DEFAULT '{}'</td><td class="note-col"></td></tr>
+                    <tr><td>created_at</td><td class="type-col">TIMESTAMPTZ</td><td>DEFAULT NOW()</td><td class="note-col"></td></tr>
+                    <tr><td>updated_at</td><td class="type-col">TIMESTAMPTZ</td><td>DEFAULT NOW()</td><td class="note-col"></td></tr>
+                </tbody>
+            </table>
+            <div class="unique-box">UNIQUE(tenant_id, name, vat_number)</div>
+        </div>
+
+        <!-- PROVIDER_CONNECTIONS -->
+        <div class="table-card" style="border: 2px solid rgba(16,185,129,0.4);">
+            <div class="table-card-header">
+                <span class="table-card-name">🔌 provider_connections</span>
+                <span class="badge badge-new">NOUVELLE v4 — remplace bank_connections + invoice_providers</span>
+            </div>
+            <div class="table-card-desc">
+                Connexions aux providers externes unifiees. Un seul pattern pour banking (Tink, GoCardless) et invoicing (Pennylane, Stripe).
+                Extensible a tout futur type de provider (accounting, crypto...).
+            </div>
+            <table>
+                <thead><tr><th>Champ</th><th>Type</th><th>Contrainte</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td>id</td><td class="type-col">UUID</td><td class="pk">PK</td><td class="note-col"></td></tr>
+                    <tr><td>tenant_id</td><td class="type-col">UUID</td><td class="fk">FK → tenants CASCADE</td><td class="note-col"></td></tr>
+                    <tr><td>user_id</td><td class="type-col">UUID</td><td class="fk">FK → users SET NULL</td><td class="note-col">Qui a cree la connexion</td></tr>
+                    <tr><td colspan="4" style="background: rgba(139,92,246,0.1); color: #a78bfa; font-weight: 600; padding: 8px 15px;">CATEGORIE & PROVIDER</td></tr>
+                    <tr><td>category</td><td class="type-col">VARCHAR(50)</td><td>NOT NULL</td><td class="note-col">banking / invoicing / accounting (futur)</td></tr>
+                    <tr><td>provider</td><td class="type-col">VARCHAR(50)</td><td>NOT NULL</td><td class="note-col">tink, gocardless, salt_edge, plaid, pennylane, stripe, xero...</td></tr>
+                    <tr><td colspan="4" style="background: rgba(139,92,246,0.1); color: #a78bfa; font-weight: 600; padding: 8px 15px;">CREDENTIALS (references Secret Manager)</td></tr>
+                    <tr><td>provider_connection_id</td><td class="type-col">VARCHAR(255)</td><td></td><td class="note-col">OAuth: requisition_id, connection_id</td></tr>
+                    <tr><td>provider_user_id</td><td class="type-col">VARCHAR(255)</td><td></td><td class="note-col">User ID chez le provider</td></tr>
+                    <tr><td>api_key_ref</td><td class="type-col">VARCHAR(255)</td><td></td><td class="note-col">Reference API key (Secret Manager)</td></tr>
+                    <tr><td>webhook_secret_ref</td><td class="type-col">VARCHAR(255)</td><td></td><td class="note-col">Reference webhook secret</td></tr>
+                    <tr><td colspan="4" style="background: rgba(139,92,246,0.1); color: #a78bfa; font-weight: 600; padding: 8px 15px;">LIFECYCLE</td></tr>
+                    <tr><td>status</td><td class="type-col">VARCHAR(50)</td><td>DEFAULT 'pending'</td><td class="note-col">pending / active / expired / error / inactive</td></tr>
+                    <tr><td>access_expires_at</td><td class="type-col">TIMESTAMPTZ</td><td></td><td class="note-col">PSD2 : expiration 90 jours (banking)</td></tr>
+                    <tr><td>last_sync_at</td><td class="type-col">TIMESTAMPTZ</td><td></td><td class="note-col">Derniere synchronisation</td></tr>
+                    <tr><td>last_sync_error</td><td class="type-col">TEXT</td><td></td><td class="note-col">Derniere erreur</td></tr>
+                    <tr><td>metadata</td><td class="type-col">JSONB</td><td>DEFAULT '{}'</td><td class="note-col"></td></tr>
+                    <tr><td>created_at</td><td class="type-col">TIMESTAMPTZ</td><td>DEFAULT NOW()</td><td class="note-col"></td></tr>
+                    <tr><td>updated_at</td><td class="type-col">TIMESTAMPTZ</td><td>DEFAULT NOW()</td><td class="note-col"></td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- BANK_ACCOUNTS -->
+        <div class="table-card">
+            <div class="table-card-header">
+                <span class="table-card-name">🏦 bank_accounts</span>
+                <span class="badge badge-kept">Inchangee</span>
+            </div>
+            <div class="table-card-desc">Comptes bancaires individuels. Enfant de provider_connections (category = 'banking').</div>
+            <table>
+                <thead><tr><th>Champ</th><th>Type</th><th>Contrainte</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td>id</td><td class="type-col">UUID</td><td class="pk">PK</td><td class="note-col"></td></tr>
+                    <tr><td>connection_id</td><td class="type-col">UUID</td><td class="fk">FK → provider_connections CASCADE</td><td class="note-col">Connexion bancaire parente</td></tr>
+                    <tr><td>tenant_id</td><td class="type-col">UUID</td><td class="fk">FK → tenants CASCADE</td><td class="note-col"></td></tr>
+                    <tr><td>provider</td><td class="type-col">VARCHAR(50)</td><td>NOT NULL</td><td class="note-col">tink / gocardless / salt_edge / plaid</td></tr>
+                    <tr><td>provider_account_id</td><td class="type-col">VARCHAR(255)</td><td>NOT NULL</td><td class="note-col">ID du compte chez le provider</td></tr>
+                    <tr><td>name</td><td class="type-col">VARCHAR(255)</td><td></td><td class="note-col">Nom du compte</td></tr>
+                    <tr><td>iban</td><td class="type-col">VARCHAR(50)</td><td></td><td class="note-col">IBAN</td></tr>
+                    <tr><td>bic</td><td class="type-col">VARCHAR(11)</td><td></td><td class="note-col">BIC</td></tr>
+                    <tr><td>currency</td><td class="type-col">VARCHAR(3)</td><td>DEFAULT 'EUR'</td><td class="note-col">Devise</td></tr>
+                    <tr><td>account_type</td><td class="type-col">VARCHAR(50)</td><td></td><td class="note-col">checking / savings / credit_card</td></tr>
+                    <tr><td>balance</td><td class="type-col">DECIMAL(15,2)</td><td></td><td class="note-col">Solde</td></tr>
+                    <tr><td>balance_updated_at</td><td class="type-col">TIMESTAMPTZ</td><td></td><td class="note-col">Date du solde</td></tr>
+                    <tr><td>bank_name</td><td class="type-col">VARCHAR(255)</td><td></td><td class="note-col">Nom de la banque</td></tr>
+                    <tr><td>bank_logo_url</td><td class="type-col">TEXT</td><td></td><td class="note-col">URL logo</td></tr>
+                    <tr><td>status</td><td class="type-col">VARCHAR(50)</td><td>DEFAULT 'active'</td><td class="note-col">active / inactive / error</td></tr>
+                    <tr><td>last_sync_at</td><td class="type-col">TIMESTAMPTZ</td><td></td><td class="note-col">Derniere sync</td></tr>
+                    <tr><td>metadata</td><td class="type-col">JSONB</td><td>DEFAULT '{}'</td><td class="note-col"></td></tr>
+                    <tr><td>created_at</td><td class="type-col">TIMESTAMPTZ</td><td>DEFAULT NOW()</td><td class="note-col"></td></tr>
+                    <tr><td>updated_at</td><td class="type-col">TIMESTAMPTZ</td><td>DEFAULT NOW()</td><td class="note-col"></td></tr>
+                </tbody>
+            </table>
+            <div class="unique-box">UNIQUE(connection_id, provider_account_id)</div>
+        </div>
+
+        <!-- TRANSACTIONS -->
+        <div class="table-card" style="border: 2px solid rgba(245,158,11,0.4);">
+            <div class="table-card-header">
+                <span class="table-card-name">💳 transactions</span>
+                <span class="badge badge-changed">Modifiee (v4)</span>
+            </div>
+            <div class="table-card-desc">Transactions bancaires. 1 seule FK counterparty_id. Champs comptables et matching IA ajoutes.</div>
+            <table>
+                <thead><tr><th>Champ</th><th>Type</th><th>Contrainte</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td>id</td><td class="type-col">UUID</td><td class="pk">PK</td><td class="note-col"></td></tr>
+                    <tr><td>tenant_id</td><td class="type-col">UUID</td><td class="fk">FK → tenants CASCADE</td><td class="note-col"></td></tr>
+                    <tr><td>account_id</td><td class="type-col">UUID</td><td class="fk">FK → bank_accounts SET NULL</td><td class="note-col">Compte bancaire source</td></tr>
+                    <tr class="new-field"><td>counterparty_id</td><td class="type-col">UUID</td><td class="fk">FK → counterparties SET NULL</td><td class="note-col">NOUVEAU v4 — remplace supplier_id + client_id</td></tr>
+                    <tr><td>source_type</td><td class="type-col">VARCHAR(50)</td><td>NOT NULL</td><td class="note-col">tink / gocardless / csv / api / manual / n8n</td></tr>
+                    <tr><td>source_id</td><td class="type-col">VARCHAR(255)</td><td>NOT NULL</td><td class="note-col">ID unique source (deduplication)</td></tr>
+                    <tr><td>source_raw</td><td class="type-col">JSONB</td><td></td><td class="note-col">Donnees brutes du provider</td></tr>
+                    <tr><td>amount</td><td class="type-col">DECIMAL(15,2)</td><td>NOT NULL</td><td class="note-col">Montant</td></tr>
+                    <tr><td>currency</td><td class="type-col">VARCHAR(3)</td><td>DEFAULT 'EUR'</td><td class="note-col">Devise</td></tr>
+                    <tr><td>transaction_date</td><td class="type-col">DATE</td><td>NOT NULL</td><td class="note-col">Date transaction</td></tr>
+                    <tr><td>booking_date</td><td class="type-col">DATE</td><td></td><td class="note-col">Date comptabilisation</td></tr>
+                    <tr><td>value_date</td><td class="type-col">DATE</td><td></td><td class="note-col">Date de valeur</td></tr>
+                    <tr><td>added_at</td><td class="type-col">TIMESTAMPTZ</td><td>DEFAULT NOW()</td><td class="note-col">Date d'ajout dans l'app</td></tr>
+                    <tr><td>payment_method</td><td class="type-col">VARCHAR(50)</td><td></td><td class="note-col">card / transfer / direct_debit / cash / check</td></tr>
+                    <tr><td>payment_context</td><td class="type-col">VARCHAR(50)</td><td></td><td class="note-col">CIT / MIT / recurring / one_time</td></tr>
+                    <tr><td>external_reference</td><td class="type-col">VARCHAR(255)</td><td></td><td class="note-col">Reference externe (PO, commande)</td></tr>
+                    <tr class="new-field"><td>remittance_info</td><td class="type-col">VARCHAR(500)</td><td></td><td class="note-col">NOUVEAU v4 — Info de remise bancaire</td></tr>
+                    <tr class="new-field"><td>structured_reference</td><td class="type-col">VARCHAR(255)</td><td></td><td class="note-col">NOUVEAU v4 — Reference structuree extraite</td></tr>
+                    <tr><td>description_original</td><td class="type-col">TEXT</td><td></td><td class="note-col">Description originale banque</td></tr>
+                    <tr><td>description_display</td><td class="type-col">TEXT</td><td></td><td class="note-col">Description modifiable</td></tr>
+                    <tr><td>category</td><td class="type-col">VARCHAR(100)</td><td></td><td class="note-col">Categorie</td></tr>
+                    <tr><td>counterparty_name</td><td class="type-col">VARCHAR(255)</td><td></td><td class="note-col">Nom brut de la contrepartie (banque)</td></tr>
+                    <tr class="new-field"><td>counterparty_name_normalized</td><td class="type-col">VARCHAR(255)</td><td></td><td class="note-col">NOUVEAU v4 — Nom normalise pour matching IA</td></tr>
+                    <tr><td>counterparty_iban</td><td class="type-col">VARCHAR(50)</td><td></td><td class="note-col">IBAN contrepartie</td></tr>
+                    <tr><td>counterparty_bic</td><td class="type-col">VARCHAR(11)</td><td></td><td class="note-col">BIC contrepartie</td></tr>
+                    <tr class="new-field"><td>ledger_account</td><td class="type-col">VARCHAR(50)</td><td></td><td class="note-col">NOUVEAU v4 — Compte comptable</td></tr>
+                    <tr class="new-field"><td>analytic_1</td><td class="type-col">VARCHAR(100)</td><td></td><td class="note-col">NOUVEAU v4 — Axe analytique 1</td></tr>
+                    <tr class="new-field"><td>analytic_2</td><td class="type-col">VARCHAR(100)</td><td></td><td class="note-col">NOUVEAU v4 — Axe analytique 2</td></tr>
+                    <tr><td>status</td><td class="type-col">VARCHAR(50)</td><td>DEFAULT 'unconsidered'</td><td class="note-col">unconsidered / unmatched / matched / ignored / pending</td></tr>
+                    <tr><td>metadata</td><td class="type-col">JSONB</td><td>DEFAULT '{}'</td><td class="note-col"></td></tr>
+                    <tr><td>created_at</td><td class="type-col">TIMESTAMPTZ</td><td>DEFAULT NOW()</td><td class="note-col"></td></tr>
+                    <tr><td>updated_at</td><td class="type-col">TIMESTAMPTZ</td><td>DEFAULT NOW()</td><td class="note-col"></td></tr>
+                </tbody>
+            </table>
+            <div class="unique-box">UNIQUE(tenant_id, source_type, source_id)</div>
+        </div>
+
+        <!-- INVOICES -->
+        <div class="table-card" style="border: 2px solid rgba(245,158,11,0.4);">
+            <div class="table-card-header">
+                <span class="table-card-name">📄 invoices</span>
+                <span class="badge badge-changed">Modifiee (v4)</span>
+            </div>
+            <div class="table-card-desc">Factures emises et recues. 1 seule FK counterparty_id. Provider via provider_connection_id.</div>
+            <table>
+                <thead><tr><th>Champ</th><th>Type</th><th>Contrainte</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td>id</td><td class="type-col">UUID</td><td class="pk">PK</td><td class="note-col"></td></tr>
+                    <tr><td>tenant_id</td><td class="type-col">UUID</td><td class="fk">FK → tenants CASCADE</td><td class="note-col"></td></tr>
+                    <tr class="new-field"><td>provider_connection_id</td><td class="type-col">UUID</td><td class="fk">FK → provider_connections SET NULL</td><td class="note-col">NOUVEAU v4 — remplace provider_id → invoice_providers</td></tr>
+                    <tr class="new-field"><td>counterparty_id</td><td class="type-col">UUID</td><td class="fk">FK → counterparties SET NULL</td><td class="note-col">NOUVEAU v4 — remplace supplier_id + client_id</td></tr>
+                    <tr><td>source_type</td><td class="type-col">VARCHAR(50)</td><td>NOT NULL</td><td class="note-col">pennylane / stripe / csv / api / manual</td></tr>
+                    <tr><td>source_id</td><td class="type-col">VARCHAR(255)</td><td>NOT NULL</td><td class="note-col">ID unique source</td></tr>
+                    <tr><td>source_raw</td><td class="type-col">JSONB</td><td></td><td class="note-col">Donnees brutes</td></tr>
+                    <tr><td>invoice_number</td><td class="type-col">VARCHAR(100)</td><td></td><td class="note-col">Numero de facture</td></tr>
+                    <tr><td>external_reference</td><td class="type-col">VARCHAR(255)</td><td></td><td class="note-col">Reference externe (PO, commande)</td></tr>
+                    <tr><td>invoice_date</td><td class="type-col">DATE</td><td></td><td class="note-col">Date de facturation</td></tr>
+                    <tr><td>due_date</td><td class="type-col">DATE</td><td></td><td class="note-col">Date d'echeance</td></tr>
+                    <tr><td>payment_expected_date</td><td class="type-col">DATE</td><td></td><td class="note-col">Date paiement prevu</td></tr>
+                    <tr><td>amount_excl_vat</td><td class="type-col">DECIMAL(15,2)</td><td>NOT NULL</td><td class="note-col">Montant HT</td></tr>
+                    <tr><td>vat_amount</td><td class="type-col">DECIMAL(15,2)</td><td></td><td class="note-col">Montant TVA</td></tr>
+                    <tr><td>amount_incl_vat</td><td class="type-col">DECIMAL(15,2)</td><td>NOT NULL</td><td class="note-col">Montant TTC</td></tr>
+                    <tr><td>currency</td><td class="type-col">VARCHAR(3)</td><td>DEFAULT 'EUR'</td><td class="note-col">Devise</td></tr>
+                    <tr><td>payment_method</td><td class="type-col">VARCHAR(50)</td><td></td><td class="note-col">Mode de paiement attendu</td></tr>
+                    <tr><td>recipient_name</td><td class="type-col">VARCHAR(255)</td><td></td><td class="note-col">Nom du destinataire</td></tr>
+                    <tr><td>customer_name</td><td class="type-col">VARCHAR(255)</td><td></td><td class="note-col">Nom du client (display)</td></tr>
+                    <tr><td>customer_email</td><td class="type-col">VARCHAR(255)</td><td></td><td class="note-col">Email client</td></tr>
+                    <tr><td>email_contact</td><td class="type-col">VARCHAR(255)</td><td></td><td class="note-col">Email contact</td></tr>
+                    <tr><td>phone_contact</td><td class="type-col">VARCHAR(50)</td><td></td><td class="note-col">Telephone</td></tr>
+                    <tr><td>description</td><td class="type-col">TEXT</td><td></td><td class="note-col">Description</td></tr>
+                    <tr><td>invoice_type</td><td class="type-col">VARCHAR(50)</td><td>DEFAULT 'issued'</td><td class="note-col">issued (emise) / received (recue)</td></tr>
+                    <tr><td>recovery_percent</td><td class="type-col">DECIMAL(5,2)</td><td>DEFAULT 0, CHECK 0-100</td><td class="note-col">% recouvrement (auto-calcule)</td></tr>
+                    <tr class="new-field"><td>ledger_account</td><td class="type-col">VARCHAR(50)</td><td></td><td class="note-col">NOUVEAU v4 — Compte comptable</td></tr>
+                    <tr class="new-field"><td>analytic_1</td><td class="type-col">VARCHAR(100)</td><td></td><td class="note-col">NOUVEAU v4 — Axe analytique 1</td></tr>
+                    <tr class="new-field"><td>analytic_2</td><td class="type-col">VARCHAR(100)</td><td></td><td class="note-col">NOUVEAU v4 — Axe analytique 2</td></tr>
+                    <tr><td>status</td><td class="type-col">VARCHAR(50)</td><td>DEFAULT 'unpaid'</td><td class="note-col">unpaid / partial / paid / cancelled / overdue</td></tr>
+                    <tr><td>metadata</td><td class="type-col">JSONB</td><td>DEFAULT '{}'</td><td class="note-col"></td></tr>
+                    <tr><td>created_at</td><td class="type-col">TIMESTAMPTZ</td><td>DEFAULT NOW()</td><td class="note-col"></td></tr>
+                    <tr><td>updated_at</td><td class="type-col">TIMESTAMPTZ</td><td>DEFAULT NOW()</td><td class="note-col"></td></tr>
+                </tbody>
+            </table>
+            <div class="unique-box">UNIQUE(tenant_id, source_type, source_id)</div>
+        </div>
+
+        <!-- MATCHES -->
+        <div class="table-card">
+            <div class="table-card-header">
+                <span class="table-card-name">🤝 matches</span>
+                <span class="badge badge-kept">Inchangee</span>
+            </div>
+            <div class="table-card-desc">Rapprochements transaction ↔ facture. Coeur du systeme de reconciliation.</div>
+            <table>
+                <thead><tr><th>Champ</th><th>Type</th><th>Contrainte</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td>id</td><td class="type-col">UUID</td><td class="pk">PK</td><td class="note-col"></td></tr>
+                    <tr><td>tenant_id</td><td class="type-col">UUID</td><td class="fk">FK → tenants CASCADE</td><td class="note-col"></td></tr>
+                    <tr><td>transaction_id</td><td class="type-col">UUID</td><td class="fk">FK → transactions CASCADE</td><td class="note-col"></td></tr>
+                    <tr><td>transaction_type</td><td class="type-col">VARCHAR(50)</td><td>DEFAULT 'bank'</td><td class="note-col">bank / crypto</td></tr>
+                    <tr><td>crypto_transaction_id</td><td class="type-col">UUID</td><td class="fk">FK → crypto_transactions CASCADE</td><td class="note-col"></td></tr>
+                    <tr><td>invoice_id</td><td class="type-col">UUID</td><td class="fk">FK → invoices CASCADE</td><td class="note-col"></td></tr>
+                    <tr><td>matched_amount</td><td class="type-col">DECIMAL(15,2)</td><td></td><td class="note-col">Montant rapproche (partiel OK)</td></tr>
+                    <tr><td>match_type</td><td class="type-col">VARCHAR(50)</td><td>NOT NULL</td><td class="note-col">ai_auto / manual / rule / n8n</td></tr>
+                    <tr><td>confidence_score</td><td class="type-col">DECIMAL(5,2)</td><td></td><td class="note-col">Score de confiance 0-100</td></tr>
+                    <tr><td>ai_reasoning</td><td class="type-col">TEXT</td><td></td><td class="note-col">Explication de l'IA</td></tr>
+                    <tr><td>matched_by</td><td class="type-col">UUID</td><td class="fk">FK → users</td><td class="note-col">NULL si match auto IA</td></tr>
+                    <tr><td>status</td><td class="type-col">VARCHAR(50)</td><td>DEFAULT 'active'</td><td class="note-col">active / cancelled</td></tr>
+                    <tr><td>metadata</td><td class="type-col">JSONB</td><td>DEFAULT '{}'</td><td class="note-col"></td></tr>
+                    <tr><td>created_at</td><td class="type-col">TIMESTAMPTZ</td><td>DEFAULT NOW()</td><td class="note-col"></td></tr>
+                </tbody>
+            </table>
+            <div class="unique-box">UNIQUE(transaction_id, invoice_id)</div>
+        </div>
+
+        <!-- CRYPTO TRANSACTIONS -->
+        <div class="table-card" style="border: 2px solid rgba(59,130,246,0.4);">
+            <div class="table-card-header">
+                <span class="table-card-name">💎 crypto_transactions</span>
+                <span class="badge badge-unchanged">Inchangee</span>
+            </div>
+            <div class="table-card-desc">Transactions crypto importees depuis les wallets on-chain.</div>
+            <table>
+                <thead><tr><th>Champ</th><th>Type</th><th>Contrainte</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td>id</td><td class="type-col">UUID</td><td class="pk">PK</td><td class="note-col"></td></tr>
+                    <tr><td>tenant_id</td><td class="type-col">UUID</td><td class="fk">FK → tenants CASCADE</td><td class="note-col"></td></tr>
+                    <tr><td>wallet_address</td><td class="type-col">VARCHAR(255)</td><td>NOT NULL</td><td class="note-col">Adresse du wallet source</td></tr>
+                    <tr><td>chain</td><td class="type-col">VARCHAR(50)</td><td>NOT NULL</td><td class="note-col">ethereum / polygon / bsc / solana...</td></tr>
+                    <tr><td>provider</td><td class="type-col">VARCHAR(50)</td><td>NOT NULL</td><td class="note-col">moralis / alchemy / covalent</td></tr>
+                    <tr><td>tx_hash</td><td class="type-col">VARCHAR(255)</td><td class="uk">UNIQUE</td><td class="note-col">Hash de transaction (dedoublonnage)</td></tr>
+                    <tr><td>amount</td><td class="type-col">DECIMAL(30,18)</td><td>NOT NULL</td><td class="note-col">Montant (precision crypto)</td></tr>
+                    <tr><td>token_symbol</td><td class="type-col">VARCHAR(20)</td><td></td><td class="note-col">ETH / USDC / MATIC...</td></tr>
+                    <tr><td>token_address</td><td class="type-col">VARCHAR(255)</td><td></td><td class="note-col">Adresse du contrat ERC-20</td></tr>
+                    <tr><td>from_address</td><td class="type-col">VARCHAR(255)</td><td></td><td class="note-col">Adresse emetteur</td></tr>
+                    <tr><td>to_address</td><td class="type-col">VARCHAR(255)</td><td></td><td class="note-col">Adresse destinataire</td></tr>
+                    <tr><td>transaction_date</td><td class="type-col">TIMESTAMPTZ</td><td></td><td class="note-col">Date/heure de la transaction on-chain</td></tr>
+                    <tr><td>gas_used</td><td class="type-col">DECIMAL(30,0)</td><td></td><td class="note-col">Gas consomme</td></tr>
+                    <tr><td>gas_price</td><td class="type-col">DECIMAL(30,0)</td><td></td><td class="note-col">Prix du gas (wei)</td></tr>
+                    <tr><td>status</td><td class="type-col">VARCHAR(50)</td><td>DEFAULT 'unmatched'</td><td class="note-col">unmatched / matched / ignored</td></tr>
+                    <tr><td>raw_data</td><td class="type-col">JSONB</td><td></td><td class="note-col">Donnees brutes du provider</td></tr>
+                    <tr><td>metadata</td><td class="type-col">JSONB</td><td>DEFAULT '{}'</td><td class="note-col"></td></tr>
+                    <tr><td>created_at</td><td class="type-col">TIMESTAMPTZ</td><td>DEFAULT NOW()</td><td class="note-col"></td></tr>
+                </tbody>
+            </table>
+            <div class="unique-box">UNIQUE(tx_hash)</div>
+        </div>
+
+        <!-- IMPORT JOBS -->
+        <div class="table-card" style="border: 2px solid rgba(59,130,246,0.4);">
+            <div class="table-card-header">
+                <span class="table-card-name">📥 import_jobs</span>
+                <span class="badge badge-unchanged">Inchangee</span>
+            </div>
+            <div class="table-card-desc">Suivi des imports de fichiers CSV/XLSX. Permet de tracker la progression et les erreurs.</div>
+            <table>
+                <thead><tr><th>Champ</th><th>Type</th><th>Contrainte</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td>id</td><td class="type-col">UUID</td><td class="pk">PK</td><td class="note-col"></td></tr>
+                    <tr><td>tenant_id</td><td class="type-col">UUID</td><td class="fk">FK → tenants CASCADE</td><td class="note-col"></td></tr>
+                    <tr><td>user_id</td><td class="type-col">UUID</td><td class="fk">FK → users SET NULL</td><td class="note-col">Utilisateur qui a lance l'import</td></tr>
+                    <tr><td>file_name</td><td class="type-col">VARCHAR(255)</td><td>NOT NULL</td><td class="note-col">Nom du fichier uploade</td></tr>
+                    <tr><td>file_type</td><td class="type-col">VARCHAR(50)</td><td>NOT NULL</td><td class="note-col">transactions / invoices / counterparties</td></tr>
+                    <tr><td>file_format</td><td class="type-col">VARCHAR(20)</td><td></td><td class="note-col">csv / xlsx / json</td></tr>
+                    <tr><td>total_rows</td><td class="type-col">INTEGER</td><td>DEFAULT 0</td><td class="note-col">Nombre total de lignes</td></tr>
+                    <tr><td>processed_rows</td><td class="type-col">INTEGER</td><td>DEFAULT 0</td><td class="note-col">Lignes traitees avec succes</td></tr>
+                    <tr><td>error_rows</td><td class="type-col">INTEGER</td><td>DEFAULT 0</td><td class="note-col">Lignes en erreur</td></tr>
+                    <tr><td>errors</td><td class="type-col">JSONB</td><td>DEFAULT '[]'</td><td class="note-col">Detail des erreurs [{row, field, message}]</td></tr>
+                    <tr><td>status</td><td class="type-col">VARCHAR(50)</td><td>DEFAULT 'pending'</td><td class="note-col">pending / processing / completed / failed</td></tr>
+                    <tr><td>started_at</td><td class="type-col">TIMESTAMPTZ</td><td></td><td class="note-col">Debut du traitement</td></tr>
+                    <tr><td>completed_at</td><td class="type-col">TIMESTAMPTZ</td><td></td><td class="note-col">Fin du traitement</td></tr>
+                    <tr><td>metadata</td><td class="type-col">JSONB</td><td>DEFAULT '{}'</td><td class="note-col"></td></tr>
+                    <tr><td>created_at</td><td class="type-col">TIMESTAMPTZ</td><td>DEFAULT NOW()</td><td class="note-col"></td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- WEBHOOK EVENTS -->
+        <div class="table-card" style="border: 2px solid rgba(59,130,246,0.4);">
+            <div class="table-card-header">
+                <span class="table-card-name">🔗 webhook_events</span>
+                <span class="badge badge-unchanged">Inchangee</span>
+            </div>
+            <div class="table-card-desc">Idempotence des webhooks. Stocke chaque event recu pour eviter les doublons.</div>
+            <table>
+                <thead><tr><th>Champ</th><th>Type</th><th>Contrainte</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td>id</td><td class="type-col">UUID</td><td class="pk">PK</td><td class="note-col"></td></tr>
+                    <tr><td>event_id</td><td class="type-col">VARCHAR(255)</td><td class="uk">UNIQUE NOT NULL</td><td class="note-col">ID evenement du provider (dedoublonnage)</td></tr>
+                    <tr><td>provider</td><td class="type-col">VARCHAR(50)</td><td>NOT NULL</td><td class="note-col">tink / gocardless / pennylane / stripe...</td></tr>
+                    <tr><td>received_at</td><td class="type-col">TIMESTAMPTZ</td><td>DEFAULT NOW()</td><td class="note-col">Date de reception</td></tr>
+                    <tr><td>processed</td><td class="type-col">BOOLEAN</td><td>DEFAULT FALSE</td><td class="note-col">Traite avec succes ?</td></tr>
+                    <tr><td>payload</td><td class="type-col">JSONB</td><td></td><td class="note-col">Corps complet du webhook</td></tr>
+                    <tr><td>metadata</td><td class="type-col">JSONB</td><td>DEFAULT '{}'</td><td class="note-col"></td></tr>
+                </tbody>
+            </table>
+            <div class="unique-box">UNIQUE(event_id)</div>
+        </div>
+
+        <!-- AUDIT LOG -->
+        <div class="table-card" style="border: 2px solid rgba(59,130,246,0.4);">
+            <div class="table-card-header">
+                <span class="table-card-name">📝 audit_log</span>
+                <span class="badge badge-unchanged">Inchangee</span>
+            </div>
+            <div class="table-card-desc">Journal d'audit complet. Trace chaque action utilisateur avec les valeurs avant/apres.</div>
+            <table>
+                <thead><tr><th>Champ</th><th>Type</th><th>Contrainte</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td>id</td><td class="type-col">BIGSERIAL</td><td class="pk">PK</td><td class="note-col">Auto-increment (haute cardinalite)</td></tr>
+                    <tr><td>tenant_id</td><td class="type-col">UUID</td><td></td><td class="note-col">Tenant concerne (pas FK pour perf)</td></tr>
+                    <tr><td>user_id</td><td class="type-col">UUID</td><td></td><td class="note-col">Utilisateur ayant effectue l'action</td></tr>
+                    <tr><td>action</td><td class="type-col">VARCHAR(50)</td><td>NOT NULL</td><td class="note-col">create / update / delete / login / export...</td></tr>
+                    <tr><td>resource_type</td><td class="type-col">VARCHAR(50)</td><td></td><td class="note-col">invoices / transactions / matches / users...</td></tr>
+                    <tr><td>resource_id</td><td class="type-col">UUID</td><td></td><td class="note-col">ID de la ressource modifiee</td></tr>
+                    <tr><td>old_values</td><td class="type-col">JSONB</td><td></td><td class="note-col">Valeurs avant modification</td></tr>
+                    <tr><td>new_values</td><td class="type-col">JSONB</td><td></td><td class="note-col">Valeurs apres modification</td></tr>
+                    <tr><td>ip_address</td><td class="type-col">INET</td><td></td><td class="note-col">Adresse IP de l'utilisateur</td></tr>
+                    <tr><td>metadata</td><td class="type-col">JSONB</td><td>DEFAULT '{}'</td><td class="note-col">user_agent, session_id, etc.</td></tr>
+                    <tr><td>created_at</td><td class="type-col">TIMESTAMPTZ</td><td>DEFAULT NOW()</td><td class="note-col"></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- TRIGGERS                                      -->
+    <!-- ============================================ -->
+    <div class="section">
+        <h2>🔄 Triggers Auto-Calcules</h2>
+        <div class="grid-2">
+            <div class="card card-purple">
+                <h4>update_invoice_recovery()</h4>
+                <p style="color: #94a3b8; margin: 10px 0;">Declencheur : INSERT / UPDATE / DELETE sur <code>matches</code></p>
+                <p style="color: #cbd5e1;">Recalcule sur <code>invoices</code> :</p>
+                <ul style="color: #cbd5e1; margin: 10px 0 0 20px;">
+                    <li><code>recovery_percent</code> = SUM(matched_amount) / amount_incl_vat * 100</li>
+                    <li><code>status</code> → unpaid / partial / paid</li>
+                </ul>
+            </div>
+            <div class="card card-green">
+                <h4>update_counterparty_payment_analytics() <span class="badge badge-new">v4</span></h4>
+                <p style="color: #94a3b8; margin: 10px 0;">Declencheur : INSERT / UPDATE / DELETE sur <code>matches</code></p>
+                <p style="color: #cbd5e1;">Recalcule sur <code>counterparties</code> (si type = 'client' ou 'both') :</p>
+                <ul style="color: #cbd5e1; margin: 10px 0 0 20px;">
+                    <li><code>payment_score</code> = total_paid / total_invoiced * 100</li>
+                    <li><code>avg_payment_days</code> = AVG(transaction_date - invoice_date)</li>
+                    <li><code>total_invoiced</code>, <code>total_paid</code>, <code>invoice_count</code></li>
+                    <li><code>last_invoice_date</code>, <code>last_payment_date</code></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- RELATIONS                                     -->
+    <!-- ============================================ -->
+    <div class="section">
+        <h2>🔗 Resume des Relations (22 FK)</h2>
+        <table>
+            <thead><tr><th>#</th><th>De</th><th>Champ FK</th><th>Vers</th><th>Type</th><th>Cascade</th></tr></thead>
+            <tbody>
+                <tr><td>1</td><td>tenants</td><td>organization_id</td><td>organizations</td><td>N:1</td><td>CASCADE</td></tr>
+                <tr><td>2</td><td>users</td><td>organization_id</td><td>organizations</td><td>N:1</td><td>CASCADE</td></tr>
+                <tr><td>3</td><td>tenant_members</td><td>tenant_id</td><td>tenants</td><td>N:1</td><td>CASCADE</td></tr>
+                <tr><td>4</td><td>tenant_members</td><td>user_id</td><td>users</td><td>N:1</td><td>CASCADE</td></tr>
+                <tr><td>5</td><td>counterparties</td><td>tenant_id</td><td>tenants</td><td>N:1</td><td>CASCADE</td></tr>
+                <tr><td>6</td><td>provider_connections</td><td>tenant_id</td><td>tenants</td><td>N:1</td><td>CASCADE</td></tr>
+                <tr><td>7</td><td>provider_connections</td><td>user_id</td><td>users</td><td>N:1</td><td>SET NULL</td></tr>
+                <tr><td>8</td><td>bank_accounts</td><td>connection_id</td><td>provider_connections</td><td>N:1</td><td>CASCADE</td></tr>
+                <tr><td>9</td><td>bank_accounts</td><td>tenant_id</td><td>tenants</td><td>N:1</td><td>CASCADE</td></tr>
+                <tr><td>10</td><td>transactions</td><td>tenant_id</td><td>tenants</td><td>N:1</td><td>CASCADE</td></tr>
+                <tr><td>11</td><td>transactions</td><td>account_id</td><td>bank_accounts</td><td>N:1</td><td>SET NULL</td></tr>
+                <tr style="background: rgba(16,185,129,0.08);"><td>12</td><td>transactions</td><td>counterparty_id</td><td>counterparties</td><td>N:1</td><td>SET NULL</td></tr>
+                <tr><td>13</td><td>invoices</td><td>tenant_id</td><td>tenants</td><td>N:1</td><td>CASCADE</td></tr>
+                <tr style="background: rgba(16,185,129,0.08);"><td>14</td><td>invoices</td><td>provider_connection_id</td><td>provider_connections</td><td>N:1</td><td>SET NULL</td></tr>
+                <tr style="background: rgba(16,185,129,0.08);"><td>15</td><td>invoices</td><td>counterparty_id</td><td>counterparties</td><td>N:1</td><td>SET NULL</td></tr>
+                <tr><td>16</td><td>matches</td><td>tenant_id</td><td>tenants</td><td>N:1</td><td>CASCADE</td></tr>
+                <tr><td>17</td><td>matches</td><td>transaction_id</td><td>transactions</td><td>N:1</td><td>CASCADE</td></tr>
+                <tr><td>18</td><td>matches</td><td>invoice_id</td><td>invoices</td><td>N:1</td><td>CASCADE</td></tr>
+                <tr><td>19</td><td>matches</td><td>crypto_transaction_id</td><td>crypto_transactions</td><td>N:1</td><td>CASCADE</td></tr>
+                <tr><td>20</td><td>matches</td><td>matched_by</td><td>users</td><td>N:1</td><td>SET NULL</td></tr>
+                <tr><td>21</td><td>crypto_transactions</td><td>tenant_id</td><td>tenants</td><td>N:1</td><td>CASCADE</td></tr>
+                <tr><td>22</td><td>import_jobs</td><td>tenant_id</td><td>tenants</td><td>N:1</td><td>CASCADE</td></tr>
+            </tbody>
+        </table>
+        <p style="margin-top: 10px; color: #94a3b8; font-size: 0.9em;">
+            Les lignes vertes indiquent les nouvelles relations v4.
+        </p>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- FLUX                                          -->
+    <!-- ============================================ -->
+    <div class="section">
+        <h2>🔀 Flux de Donnees</h2>
+        <div class="grid-2">
+            <div class="card card-green">
+                <h4>Flux 1 : Facture EMISE → Paiement</h4>
+                <pre><code>Organization
+  → Tenant
+    → Counterparty (type: client | both)
+      → Invoice (invoice_type: 'issued')
+        → Match
+          → Transaction (amount > 0)
+            → Bank Account
+              → Provider Connection (category: banking)</code></pre>
+            </div>
+            <div class="card card-blue">
+                <h4>Flux 2 : Facture RECUE → Paiement</h4>
+                <pre><code>Organization
+  → Tenant
+    → Counterparty (type: supplier | both)
+      → Invoice (invoice_type: 'received')
+        → Match
+          → Transaction (amount < 0)
+            → Bank Account
+              → Provider Connection (category: banking)</code></pre>
+            </div>
+            <div class="card card-purple">
+                <h4>Flux 3 : Permissions</h4>
+                <pre><code>User (org_role: owner/admin/member)
+  → Organization
+    → Tenant
+      → Tenant Member (role: admin/editor/viewer)
+        → Tenant Data</code></pre>
+            </div>
+            <div class="card card-orange">
+                <h4>Flux 4 : Matching IA</h4>
+                <pre><code>Transaction (unmatched)
+  → Pre-filtre: montant ±10%, date ±30j
+    → Lookup counterparty_name_normalized
+      → Vertex AI: score de confiance
+        → Match (auto si ≥85%)
+          → Trigger: update_invoice_recovery()
+          → Trigger: update_counterparty_analytics()</code></pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- ALERTES ON-THE-FLY                            -->
+    <!-- ============================================ -->
+    <div class="section">
+        <h2>🔔 Alertes (sans table dediee)</h2>
+        <p style="color: #94a3b8; margin-bottom: 15px;">Toutes les alertes sont des queries temps reel sur les tables existantes :</p>
+        <table>
+            <thead><tr><th>Alerte</th><th>Query SQL</th></tr></thead>
+            <tbody>
+                <tr><td style="color: #e2e8f0;">Matches a valider</td><td class="note-col"><code>SELECT FROM matches WHERE confidence_score BETWEEN 50 AND 85 AND match_type = 'ai_auto'</code></td></tr>
+                <tr><td style="color: #e2e8f0;">Factures en retard</td><td class="note-col"><code>SELECT FROM invoices WHERE due_date < NOW() AND status IN ('unpaid','partial')</code></td></tr>
+                <tr><td style="color: #e2e8f0;">Erreurs de sync</td><td class="note-col"><code>SELECT FROM provider_connections WHERE status = 'error'</code></td></tr>
+                <tr><td style="color: #e2e8f0;">Connexions expirees</td><td class="note-col"><code>SELECT FROM provider_connections WHERE access_expires_at < NOW() + interval '7 days'</code></td></tr>
+                <tr><td style="color: #e2e8f0;">Transactions non rapprochees</td><td class="note-col"><code>SELECT FROM transactions WHERE status = 'unmatched' AND created_at < NOW() - interval '7d'</code></td></tr>
+                <tr><td style="color: #e2e8f0;">Mauvais payeurs</td><td class="note-col"><code>SELECT FROM counterparties WHERE type IN ('client','both') AND payment_score < 50</code></td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- FOOTER -->
+    <div style="text-align: center; padding: 40px 20px; color: #475569; font-size: 0.9em;">
+        <p style="margin-bottom: 5px;"><strong>Invunion</strong> - Architecture v4 Schema</p>
+        <p>13 tables &bull; 22 relations &bull; 2 triggers &bull; Optimise matching IA + comptabilite</p>
+        <p style="margin-top: 10px;">Document cree: 13 fevrier 2026</p>
+    </div>
+
+</div>
+</body>
+</html>
