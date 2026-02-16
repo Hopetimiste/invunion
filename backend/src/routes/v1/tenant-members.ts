@@ -68,7 +68,7 @@ router.post('/', async (req, res) => {
     }
 
     // Check if user exists and belongs to same organization
-    const userCheck = await pool.query(
+    const userCheck = await query(
       `SELECT u.id, u.organization_id, t.organization_id as tenant_org_id
        FROM users u
        CROSS JOIN tenants t
