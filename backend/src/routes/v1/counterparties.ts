@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { pool } from '../../config/database.js';
+import { query } from '../../config/database.js';
 import { ApiResponse, Counterparty, ListParams, PaginatedResponse } from '../../types/index.js';
 
 const router = Router();
@@ -52,7 +52,7 @@ router.get('/', async (req, res) => {
     const whereClause = conditions.join(' AND ');
 
     // Count total
-    const countResult = await pool.query(
+    const countResult = await query(
       `SELECT COUNT(*) FROM counterparties WHERE ${whereClause}`,
       values
     );
@@ -60,7 +60,7 @@ router.get('/', async (req, res) => {
 
     // Fetch items
     values.push(pageSize, offset);
-    const result = await pool.query(
+    const result = await query(
       `SELECT * FROM counterparties
        WHERE ${whereClause}
        ORDER BY ${sortBy} ${sortOrder}
@@ -99,7 +99,7 @@ router.get('/:id', async (req, res) => {
     const { id } = req.params;
     const tenantId = req.user?.tenantId;
 
-    const result = await pool.query(
+    const result = await query(
       'SELECT * FROM counterparties WHERE id = $1 AND tenant_id = $2',
       [id, tenantId]
     );
@@ -136,7 +136,7 @@ router.get('/:id/invoices', async (req, res) => {
     const { id } = req.params;
     const tenantId = req.user?.tenantId;
 
-    const result = await pool.query(
+    const result = await query(
       `SELECT * FROM invoices 
        WHERE counterparty_id = $1 AND tenant_id = $2
        ORDER BY invoice_date DESC`,
@@ -168,7 +168,7 @@ router.get('/:id/transactions', async (req, res) => {
     const { id } = req.params;
     const tenantId = req.user?.tenantId;
 
-    const result = await pool.query(
+    const result = await query(
       `SELECT * FROM transactions 
        WHERE counterparty_id = $1 AND tenant_id = $2
        ORDER BY transaction_date DESC`,
@@ -238,7 +238,7 @@ router.post('/', async (req, res) => {
       });
     }
 
-    const result = await pool.query(
+    const result = await query(
       `INSERT INTO counterparties (
         tenant_id, type, name, legal_name, vat_number, category,
         external_organization_id, external_entity_id, external_service_id,
@@ -330,7 +330,7 @@ router.patch('/:id', async (req, res) => {
     updates.push(`updated_at = NOW()`);
     values.push(id, tenantId);
 
-    const result = await pool.query(
+    const result = await query(
       `UPDATE counterparties
        SET ${updates.join(', ')}
        WHERE id = $${paramIndex} AND tenant_id = $${paramIndex + 1}
@@ -371,7 +371,7 @@ router.delete('/:id', async (req, res) => {
     const { id } = req.params;
     const tenantId = req.user?.tenantId;
 
-    const result = await pool.query(
+    const result = await query(
       'DELETE FROM counterparties WHERE id = $1 AND tenant_id = $2 RETURNING id',
       [id, tenantId]
     );

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { pool } from '../../config/database.js';
+import { query } from '../../config/database.js';
 import { ApiResponse, TenantMember } from '../../types/index.js';
 
 const router = Router();
@@ -18,7 +18,7 @@ router.get('/', async (req, res) => {
       });
     }
 
-    const result = await pool.query(
+    const result = await query(
       `SELECT tm.*,
         u.email, u.first_name, u.last_name, u.org_role
        FROM tenant_members tm
@@ -90,7 +90,7 @@ router.post('/', async (req, res) => {
       });
     }
 
-    const result = await pool.query(
+    const result = await query(
       `INSERT INTO tenant_members (tenant_id, user_id, role)
        VALUES ($1, $2, $3)
        RETURNING *`,
@@ -139,7 +139,7 @@ router.patch('/:id', async (req, res) => {
       });
     }
 
-    const result = await pool.query(
+    const result = await query(
       `UPDATE tenant_members
        SET role = $1
        WHERE id = $2 AND tenant_id = $3
@@ -180,7 +180,7 @@ router.delete('/:id', async (req, res) => {
     const { id } = req.params;
     const tenantId = req.user?.tenantId;
 
-    const result = await pool.query(
+    const result = await query(
       'DELETE FROM tenant_members WHERE id = $1 AND tenant_id = $2 RETURNING id',
       [id, tenantId]
     );

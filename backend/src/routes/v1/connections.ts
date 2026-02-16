@@ -138,10 +138,10 @@ router.post('/banking/init',
     
     // Create pending connection record
     const connectionId = uuidv4();
-    await query<BankConnection>(
-      `INSERT INTO bank_connections (
-        id, tenant_id, user_id, provider, status, metadata, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, 'pending', $5, NOW(), NOW())`,
+    await query<ProviderConnection>(
+      `INSERT INTO provider_connections (
+        id, tenant_id, user_id, category, provider, status, metadata, created_at, updated_at
+      ) VALUES ($1, $2, $3, 'banking', $4, 'pending', $5, NOW(), NOW())`,
       [connectionId, tenantId, userId, provider, JSON.stringify({ market, locale, bankId })]
     );
     
@@ -175,7 +175,7 @@ router.post('/banking/init',
     } catch (error: any) {
       // Update connection status to error
       await query(
-        'UPDATE bank_connections SET status = $1, last_sync_error = $2, updated_at = NOW() WHERE id = $3',
+        'UPDATE provider_connections SET status = $1, last_sync_error = $2, updated_at = NOW() WHERE id = $3',
         ['error', error.message, connectionId]
       );
       throw error;
@@ -201,7 +201,7 @@ router.get('/banking/:provider/callback',
     
     if (error) {
       await query(
-        'UPDATE bank_connections SET status = $1, last_sync_error = $2, updated_at = NOW() WHERE id = $3',
+        'UPDATE provider_connections SET status = $1, last_sync_error = $2, updated_at = NOW() WHERE id = $3',
         ['error', String(error), connectionId]
       );
       throw new AppError(`Bank authorization failed: ${error}`, 400);
@@ -222,7 +222,7 @@ router.get('/banking/:provider/callback',
       
       // Update connection with provider connection ID
       await query(
-        `UPDATE bank_connections 
+        `UPDATE provider_connections 
          SET status = 'active', 
              provider_connection_id = $1, 
              access_expires_at = NOW() + INTERVAL '90 days',
@@ -242,7 +242,7 @@ router.get('/banking/:provider/callback',
               name, iban, bic, currency, account_type, balance, bank_name,
               status, created_at, updated_at
             ) VALUES ($1, $2, 
-              (SELECT tenant_id FROM bank_connections WHERE id = $2),
+              (SELECT tenant_id FROM provider_connections WHERE id = $2 AND category = 'banking'),
               $3, $4, $5, $6, $7, $8, $9, $10, $11, 'active', NOW(), NOW())
             ON CONFLICT (connection_id, provider_account_id) DO UPDATE SET
               name = EXCLUDED.name,
@@ -267,7 +267,7 @@ router.get('/banking/:provider/callback',
       });
     } catch (error: any) {
       await query(
-        'UPDATE bank_connections SET status = $1, last_sync_error = $2, updated_at = NOW() WHERE id = $3',
+        'UPDATE provider_connections SET status = $1, last_sync_error = $2, updated_at = NOW() WHERE id = $3',
         ['error', error.message, connectionId]
       );
       throw error;
@@ -285,8 +285,9 @@ router.get('/banking', asyncHandler(async (req: Request, res: Response) => {
   let queryStr = `
     SELECT bc.*, 
       (SELECT COUNT(*) FROM bank_accounts WHERE connection_id = bc.id) as account_count
-    FROM bank_connections bc
-    WHERE bc.tenant_id = $1
+    FROM provider_connections bc
+    WHERE bc.category = 'banking'
+      AND bc.tenant_id = $1
   `;
   const params: any[] = [tenantId];
   
@@ -297,7 +298,7 @@ router.get('/banking', asyncHandler(async (req: Request, res: Response) => {
   
   queryStr += ' ORDER BY bc.created_at DESC';
   
-  const result = await query<BankConnection & { account_count: number }>(queryStr, params);
+  const result = await query<ProviderConnection & { account_count: number }>(queryStr, params);
   
   res.json({
     success: true,
@@ -314,9 +315,9 @@ router.get('/banking/:id',
     const tenantId = req.user!.tenantId;
     const { id } = req.params;
     
-    const result = await query<BankConnection>(
-      'SELECT * FROM bank_connections WHERE id = $1 AND tenant_id = $2',
-      [id, tenantId]
+    const result = await query<ProviderConnection>(
+      'SELECT * FROM provider_connections WHERE id = $1 AND tenant_id = $2 AND category = $3',
+      [id, tenantId, 'banking']
     );
     
     if (result.rows.length === 0) {
@@ -341,8 +342,8 @@ router.get('/banking/:id/accounts',
     
     // Verify connection belongs to tenant
     const connResult = await query(
-      'SELECT id, provider FROM bank_connections WHERE id = $1 AND tenant_id = $2',
-      [id, tenantId]
+      'SELECT id, provider FROM provider_connections WHERE id = $1 AND tenant_id = $2 AND category = $3',
+      [id, tenantId, 'banking']
     );
     
     if (connResult.rows.length === 0) {
@@ -370,9 +371,9 @@ router.post('/banking/:id/sync',
     const tenantId = req.user!.tenantId;
     const { id } = req.params;
     
-    const connResult = await query<BankConnection>(
-      'SELECT * FROM bank_connections WHERE id = $1 AND tenant_id = $2',
-      [id, tenantId]
+    const connResult = await query<ProviderConnection>(
+      'SELECT * FROM provider_connections WHERE id = $1 AND tenant_id = $2 AND category = $3',
+      [id, tenantId, 'banking']
     );
     
     if (connResult.rows.length === 0) {
@@ -388,7 +389,7 @@ router.post('/banking/:id/sync',
     // TODO: Trigger sync via Pub/Sub
     // For now, just update last_sync_at
     await query(
-      'UPDATE bank_connections SET last_sync_at = NOW(), updated_at = NOW() WHERE id = $1',
+      'UPDATE provider_connections SET last_sync_at = NOW(), updated_at = NOW() WHERE id = $1',
       [id]
     );
     
@@ -408,9 +409,9 @@ router.delete('/banking/:id',
     const tenantId = req.user!.tenantId;
     const { id } = req.params;
     
-    const connResult = await query<BankConnection>(
-      'SELECT * FROM bank_connections WHERE id = $1 AND tenant_id = $2',
-      [id, tenantId]
+    const connResult = await query<ProviderConnection>(
+      'SELECT * FROM provider_connections WHERE id = $1 AND tenant_id = $2 AND category = $3',
+      [id, tenantId, 'banking']
     );
     
     if (connResult.rows.length === 0) {
@@ -430,7 +431,7 @@ router.delete('/banking/:id',
     }
     
     // Delete connection (cascades to accounts)
-    await query('DELETE FROM bank_connections WHERE id = $1', [id]);
+    await query('DELETE FROM provider_connections WHERE id = $1 AND category = $2', [id, 'banking']);
     
     res.json({
       success: true,
@@ -458,9 +459,9 @@ router.post('/tink/init', asyncHandler(async (req: Request, res: Response) => {
 router.get('/tink', asyncHandler(async (req: Request, res: Response) => {
   const tenantId = req.user!.tenantId;
   
-  const result = await query<BankConnection>(
-    `SELECT * FROM bank_connections 
-     WHERE tenant_id = $1 AND provider = 'tink'
+  const result = await query<ProviderConnection>(
+    `SELECT * FROM provider_connections 
+     WHERE tenant_id = $1 AND provider = 'tink' AND category = 'banking'
      ORDER BY created_at DESC`,
     [tenantId]
   );

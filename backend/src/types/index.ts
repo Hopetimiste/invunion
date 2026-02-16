@@ -604,6 +604,10 @@ export interface ListParams {
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
   filters?: Record<string, any>;
+  // Common filters (can be extended)
+  type?: string;
+  status?: string;
+  search?: string;
 }
 
 // ============================================

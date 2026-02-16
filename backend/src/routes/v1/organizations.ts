@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { pool } from '../../config/database.js';
+import { query } from '../../config/database.js';
 import { ApiResponse, Organization, ListParams, PaginatedResponse } from '../../types/index.js';
 
 const router = Router();
@@ -13,10 +13,10 @@ router.get('/', async (req, res) => {
     const { page = 1, pageSize = 20, sortBy = 'created_at', sortOrder = 'desc' } = req.query as ListParams;
     const offset = ((page as number) - 1) * (pageSize as number);
 
-    const countResult = await pool.query('SELECT COUNT(*) FROM organizations');
+    const countResult = await query('SELECT COUNT(*) FROM organizations');
     const total = parseInt(countResult.rows[0].count);
 
-    const result = await pool.query(
+    const result = await query(
       `SELECT * FROM organizations 
        ORDER BY ${sortBy} ${sortOrder}
        LIMIT $1 OFFSET $2`,
@@ -53,7 +53,7 @@ router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
-    const result = await pool.query(
+    const result = await query(
       'SELECT * FROM organizations WHERE id = $1',
       [id]
     );
@@ -89,7 +89,7 @@ router.get('/:id/tenants', async (req, res) => {
   try {
     const { id } = req.params;
 
-    const result = await pool.query(
+    const result = await query(
       `SELECT t.*, 
         (SELECT COUNT(*) FROM tenant_members tm WHERE tm.tenant_id = t.id) as member_count
        FROM tenants t
@@ -122,7 +122,7 @@ router.get('/:id/users', async (req, res) => {
   try {
     const { id } = req.params;
 
-    const result = await pool.query(
+    const result = await query(
       `SELECT u.*,
         (SELECT json_agg(json_build_object(
           'tenant_id', tm.tenant_id,
@@ -182,7 +182,7 @@ router.post('/', async (req, res) => {
     // Generate slug if not provided
     const finalSlug = slug || name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
-    const result = await pool.query(
+    const result = await query(
       `INSERT INTO organizations (
         name, slug, plan, billing_email, max_tenants, max_users, settings, status
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -275,7 +275,7 @@ router.patch('/:id', async (req, res) => {
     updates.push(`updated_at = NOW()`);
     values.push(id);
 
-    const result = await pool.query(
+    const result = await query(
       `UPDATE organizations 
        SET ${updates.join(', ')}
        WHERE id = $${paramIndex}
@@ -315,7 +315,7 @@ router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
-    const result = await pool.query(
+    const result = await query(
       'DELETE FROM organizations WHERE id = $1 RETURNING id',
       [id]
     );
