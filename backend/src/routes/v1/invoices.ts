@@ -1,8 +1,7 @@
 /**
- * Invoices routes - v2
- * Updated with new fields: amount_excl_vat, amount_incl_vat, invoice_date, 
- * payment_expected_date, payment_method, external_reference, email_contact,
- * phone_contact, currency, recipient_name, recovery_percent
+ * Invoices routes - v4.1
+ * Updated with v4.1 schema: kind (invoice/credit_note), origin_invoice_id,
+ * counterparty_id, settled_amount, open_amount, accounting fields
  */
 
 import { Router, Request, Response } from 'express';
@@ -25,23 +24,28 @@ router.use(requireAuth);
 const PaymentMethodEnum = z.enum(['card', 'transfer', 'direct_debit', 'cash', 'check', 'crypto', 'other']);
 const InvoiceStatusEnum = z.enum(['unpaid', 'partial', 'paid', 'cancelled', 'overdue']);
 const InvoiceTypeEnum = z.enum(['issued', 'received']);
+const InvoiceKindEnum = z.enum(['invoice', 'credit_note']);
 
 const ListInvoicesSchema = PaginationSchema.merge(DateRangeSchema).extend({
   status: InvoiceStatusEnum.optional(),
   type: InvoiceTypeEnum.optional(),
-  supplierId: z.string().uuid().optional(),
+  kind: InvoiceKindEnum.optional(),
+  counterpartyId: z.string().uuid().optional(),
   paymentMethod: PaymentMethodEnum.optional(),
   search: z.string().max(100).optional(),
   externalReference: z.string().max(255).optional(),
   minRecovery: z.coerce.number().min(0).max(100).optional(),
   maxRecovery: z.coerce.number().min(0).max(100).optional(),
+  hasOpen: z.enum(['true', 'false']).optional(),  // open_amount > 0
   overdue: z.enum(['true', 'false']).optional(),
 });
 
 const CreateInvoiceSchema = z.object({
   // Source
-  providerId: z.string().uuid().optional().nullable(),
-  supplierId: z.string().uuid().optional().nullable(),
+  providerConnectionId: z.string().uuid().optional().nullable(),
+  counterpartyId: z.string().uuid().optional().nullable(),
+  originInvoiceId: z.string().uuid().optional().nullable(),  // v4.1 (for credit notes)
+  kind: InvoiceKindEnum.default('invoice'),  // v4.1
   sourceType: z.string().min(1).max(50).default('manual'),
   sourceId: z.string().min(1).max(255),
   sourceRaw: z.record(z.any()).optional().nullable(),
@@ -77,12 +81,19 @@ const CreateInvoiceSchema = z.object({
   // Type
   invoiceType: InvoiceTypeEnum.default('issued'),
   
+  // Accounting (v4.1)
+  ledgerAccount: z.string().max(50).optional().nullable(),
+  analytic1: z.string().max(100).optional().nullable(),
+  analytic2: z.string().max(100).optional().nullable(),
+  
   // Metadata
   metadata: z.record(z.any()).optional().nullable(),
 });
 
 const UpdateInvoiceSchema = z.object({
-  supplierId: z.string().uuid().optional().nullable(),
+  counterpartyId: z.string().uuid().optional().nullable(),
+  originInvoiceId: z.string().uuid().optional().nullable(),
+  kind: InvoiceKindEnum.optional(),
   externalReference: z.string().max(255).optional().nullable(),
   dueDate: z.coerce.date().optional().nullable(),
   paymentExpectedDate: z.coerce.date().optional().nullable(),
@@ -91,6 +102,9 @@ const UpdateInvoiceSchema = z.object({
   emailContact: z.string().email().max(255).optional().nullable(),
   phoneContact: z.string().max(50).optional().nullable(),
   description: z.string().max(1000).optional().nullable(),
+  ledgerAccount: z.string().max(50).optional().nullable(),
+  analytic1: z.string().max(100).optional().nullable(),
+  analytic2: z.string().max(100).optional().nullable(),
   status: InvoiceStatusEnum.optional(),
   metadata: z.record(z.any()).optional().nullable(),
 });
@@ -111,14 +125,16 @@ router.get('/',
       pageSize = 20, 
       sortBy = 'invoice_date', 
       sortOrder = 'desc',
-      status, 
+      status,
       type,
-      supplierId,
+      kind,
+      counterpartyId,
       paymentMethod,
       search, 
       externalReference,
       minRecovery,
       maxRecovery,
+      hasOpen,
       overdue,
       startDate, 
       endDate 
@@ -128,86 +144,100 @@ router.get('/',
     const params: any[] = [tenantId];
     let paramIndex = 2;
     
-    let whereClause = 'WHERE tenant_id = $1';
+    let whereClause = 'WHERE i.tenant_id = $1';
     
     if (status) {
-      whereClause += ` AND status = $${paramIndex++}`;
+      whereClause += ` AND i.status = $${paramIndex++}`;
       params.push(status);
     }
     
     if (type) {
-      whereClause += ` AND invoice_type = $${paramIndex++}`;
+      whereClause += ` AND i.invoice_type = $${paramIndex++}`;
       params.push(type);
     }
     
-    if (supplierId) {
-      whereClause += ` AND supplier_id = $${paramIndex++}`;
-      params.push(supplierId);
+    if (kind) {
+      whereClause += ` AND i.kind = $${paramIndex++}`;
+      params.push(kind);
+    }
+    
+    if (counterpartyId) {
+      whereClause += ` AND i.counterparty_id = $${paramIndex++}`;
+      params.push(counterpartyId);
     }
     
     if (paymentMethod) {
-      whereClause += ` AND payment_method = $${paramIndex++}`;
+      whereClause += ` AND i.payment_method = $${paramIndex++}`;
       params.push(paymentMethod);
     }
     
     if (externalReference) {
-      whereClause += ` AND external_reference = $${paramIndex++}`;
+      whereClause += ` AND i.external_reference = $${paramIndex++}`;
       params.push(externalReference);
     }
     
     if (minRecovery !== undefined) {
-      whereClause += ` AND recovery_percent >= $${paramIndex++}`;
+      whereClause += ` AND i.recovery_percent >= $${paramIndex++}`;
       params.push(minRecovery);
     }
     
     if (maxRecovery !== undefined) {
-      whereClause += ` AND recovery_percent <= $${paramIndex++}`;
+      whereClause += ` AND i.recovery_percent <= $${paramIndex++}`;
       params.push(maxRecovery);
     }
     
+    if (hasOpen === 'true') {
+      whereClause += ` AND i.open_amount > 0`;
+    }
+    
     if (overdue === 'true') {
-      whereClause += ` AND due_date < CURRENT_DATE AND status NOT IN ('paid', 'cancelled')`;
+      whereClause += ` AND i.due_date < CURRENT_DATE AND i.status NOT IN ('paid', 'cancelled')`;
     }
     
     if (search) {
       whereClause += ` AND (
-        invoice_number ILIKE $${paramIndex} OR 
-        recipient_name ILIKE $${paramIndex} OR 
-        customer_name ILIKE $${paramIndex} OR
-        external_reference ILIKE $${paramIndex} OR
-        description ILIKE $${paramIndex}
+        i.invoice_number ILIKE $${paramIndex} OR 
+        i.recipient_name ILIKE $${paramIndex} OR 
+        i.customer_name ILIKE $${paramIndex} OR
+        i.external_reference ILIKE $${paramIndex} OR
+        i.description ILIKE $${paramIndex}
       )`;
       params.push(`%${search}%`);
       paramIndex++;
     }
     
     if (startDate) {
-      whereClause += ` AND invoice_date >= $${paramIndex++}`;
+      whereClause += ` AND i.invoice_date >= $${paramIndex++}`;
       params.push(startDate);
     }
     
     if (endDate) {
-      whereClause += ` AND invoice_date <= $${paramIndex++}`;
+      whereClause += ` AND i.invoice_date <= $${paramIndex++}`;
       params.push(endDate);
     }
     
     // Allowed sort columns
-    const allowedSortColumns = ['invoice_date', 'due_date', 'amount_incl_vat', 'recovery_percent', 'status', 'created_at'];
-    const orderColumn = allowedSortColumns.includes(sortBy) ? sortBy : 'invoice_date';
+    const allowedSortColumns = ['invoice_date', 'due_date', 'amount_incl_vat', 'recovery_percent', 'settled_amount', 'open_amount', 'status', 'created_at'];
+    const orderColumn = 'i.' + (allowedSortColumns.includes(sortBy) ? sortBy : 'invoice_date');
     const orderDir = sortOrder === 'asc' ? 'ASC' : 'DESC';
     
     // Get total count
     const countResult = await query(
-      `SELECT COUNT(*) FROM invoices ${whereClause}`,
+      `SELECT COUNT(*) FROM invoices i ${whereClause}`,
       params
     );
     const total = parseInt(countResult.rows[0].count, 10);
     
-    // Get invoices with supplier info
+    // Get invoices with counterparty info
     const result = await query<Invoice>(
-      `SELECT i.*, s.name as supplier_name
+      `SELECT i.*, 
+        c.name as counterparty_name_display, 
+        c.type as counterparty_type,
+        c.category as counterparty_category,
+        oi.invoice_number as origin_invoice_number
        FROM invoices i
-       LEFT JOIN suppliers s ON i.supplier_id = s.id
+       LEFT JOIN counterparties c ON i.counterparty_id = c.id
+       LEFT JOIN invoices oi ON i.origin_invoice_id = oi.id
        ${whereClause} 
        ORDER BY ${orderColumn} ${orderDir} 
        LIMIT $${paramIndex++} OFFSET $${paramIndex}`,
@@ -241,11 +271,13 @@ router.get('/stats', asyncHandler(async (req: Request, res: Response) => {
       COUNT(*) FILTER (WHERE status = 'paid') as paid,
       COUNT(*) FILTER (WHERE status = 'cancelled') as cancelled,
       COUNT(*) FILTER (WHERE status = 'overdue' OR (due_date < CURRENT_DATE AND status NOT IN ('paid', 'cancelled'))) as overdue,
-      SUM(amount_incl_vat) as total_amount,
-      SUM(amount_incl_vat) FILTER (WHERE status = 'paid') as total_paid,
-      SUM(amount_incl_vat * recovery_percent / 100) as total_recovered,
-      SUM(amount_incl_vat) FILTER (WHERE status NOT IN ('paid', 'cancelled')) as total_outstanding,
-      AVG(recovery_percent) as avg_recovery_percent,
+      COUNT(*) FILTER (WHERE kind = 'invoice') as invoices_count,
+      COUNT(*) FILTER (WHERE kind = 'credit_note') as credit_notes_count,
+      SUM(amount_incl_vat) FILTER (WHERE kind = 'invoice') as total_amount,
+      SUM(settled_amount) FILTER (WHERE kind = 'invoice') as total_settled,
+      SUM(open_amount) FILTER (WHERE kind = 'invoice') as total_open,
+      SUM(amount_incl_vat) FILTER (WHERE kind = 'invoice' AND status = 'paid') as total_paid,
+      AVG(recovery_percent) FILTER (WHERE kind = 'invoice') as avg_recovery_percent,
       COUNT(*) FILTER (WHERE invoice_type = 'issued') as issued_count,
       COUNT(*) FILTER (WHERE invoice_type = 'received') as received_count
     FROM invoices 
@@ -266,9 +298,14 @@ router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
   
   const result = await query<Invoice>(
-    `SELECT i.*, s.name as supplier_name
+    `SELECT i.*, 
+      c.name as counterparty_name_display, 
+      c.type as counterparty_type,
+      oi.invoice_number as origin_invoice_number,
+      oi.kind as origin_kind
      FROM invoices i
-     LEFT JOIN suppliers s ON i.supplier_id = s.id
+     LEFT JOIN counterparties c ON i.counterparty_id = c.id
+     LEFT JOIN invoices oi ON i.origin_invoice_id = oi.id
      WHERE i.id = $1 AND i.tenant_id = $2`,
     [id, tenantId]
   );
@@ -277,10 +314,14 @@ router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
     throw new NotFoundError('Invoice');
   }
   
+  const invoice = result.rows[0];
+  
   // Get associated matches with transaction details
   const matchesResult = await query(
     `SELECT m.*, 
-            t.amount as transaction_amount, 
+            t.amount as transaction_amount,
+            t.direction,
+            t.flow_type,
             t.transaction_date,
             t.description_display as transaction_description,
             t.counterparty_name
@@ -291,69 +332,43 @@ router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
     [id]
   );
   
-  // Calculate recovery details
-  const totalMatched = matchesResult.rows.reduce((sum: number, m: any) => sum + (parseFloat(m.matched_amount) || 0), 0);
-  const invoice = result.rows[0];
+  // Get allocations if credit note
+  let allocations = [];
+  if (invoice.kind === 'credit_note') {
+    const allocResult = await query(
+      `SELECT ia.*,
+        i.invoice_number as target_invoice_number,
+        i.amount_incl_vat as target_amount
+       FROM invoice_allocations ia
+       JOIN invoices i ON ia.target_invoice_id = i.id
+       WHERE ia.credit_invoice_id = $1 AND ia.status = 'active'
+       ORDER BY ia.created_at DESC`,
+      [id]
+    );
+    allocations = allocResult.rows;
+  }
+  
+  // Get adjustments
+  const adjustmentsResult = await query(
+    `SELECT * FROM invoice_adjustments
+     WHERE invoice_id = $1 AND status = 'active'
+     ORDER BY created_at DESC`,
+    [id]
+  );
   
   res.json({
     success: true,
     data: {
       ...invoice,
       matches: matchesResult.rows,
+      allocations,
+      adjustments: adjustmentsResult.rows,
       recovery: {
         percent: invoice.recovery_percent,
-        totalMatched,
-        remaining: (invoice.amount_incl_vat || 0) - totalMatched,
+        settled: invoice.settled_amount,
+        open: invoice.open_amount,
         matchCount: matchesResult.rows.length,
       },
-    },
-  });
-}));
-
-/**
- * GET /invoices/:id/recovery - Get detailed recovery information
- */
-router.get('/:id/recovery', asyncHandler(async (req: Request, res: Response) => {
-  const tenantId = req.user!.tenantId;
-  const { id } = req.params;
-  
-  // Verify invoice exists
-  const invoiceResult = await query(
-    'SELECT id, amount_incl_vat, recovery_percent, status FROM invoices WHERE id = $1 AND tenant_id = $2',
-    [id, tenantId]
-  );
-  
-  if (invoiceResult.rows.length === 0) {
-    throw new NotFoundError('Invoice');
-  }
-  
-  const invoice = invoiceResult.rows[0];
-  
-  // Get all matches for this invoice
-  const matchesResult = await query(
-    `SELECT m.id, m.matched_amount, m.match_type, m.confidence_score, m.created_at,
-            t.id as transaction_id, t.amount as transaction_amount, 
-            t.transaction_date, t.description_display, t.counterparty_name,
-            t.payment_method, t.external_reference
-     FROM matches m
-     JOIN transactions t ON m.transaction_id = t.id
-     WHERE m.invoice_id = $1 AND m.status = 'active'
-     ORDER BY t.transaction_date DESC`,
-    [id]
-  );
-  
-  const totalMatched = matchesResult.rows.reduce((sum: number, m: any) => sum + parseFloat(m.matched_amount), 0);
-  
-  res.json({
-    success: true,
-    data: {
-      invoiceId: id,
-      invoiceAmount: invoice.amount_incl_vat,
-      recoveryPercent: invoice.recovery_percent,
-      status: invoice.status,
-      totalMatched,
-      remaining: invoice.amount_incl_vat - totalMatched,
-      matches: matchesResult.rows,
     },
   });
 }));
@@ -369,27 +384,35 @@ router.post('/',
     
     const result = await query<Invoice>(
       `INSERT INTO invoices (
-        tenant_id, provider_id, supplier_id, source_type, source_id, source_raw,
+        tenant_id, provider_connection_id, counterparty_id, origin_invoice_id, kind,
+        source_type, source_id, source_raw,
         invoice_number, external_reference,
         invoice_date, due_date, payment_expected_date,
         amount_excl_vat, vat_amount, amount_incl_vat, currency,
         payment_method,
         recipient_name, customer_name, customer_email, email_contact, phone_contact,
-        description, invoice_type, recovery_percent, status, metadata
+        description, invoice_type,
+        ledger_account, analytic_1, analytic_2,
+        recovery_percent, status, metadata
       ) VALUES (
-        $1, $2, $3, $4, $5, $6,
-        $7, $8,
-        $9, $10, $11,
-        $12, $13, $14, $15,
-        $16,
-        $17, $18, $19, $20, $21,
-        $22, $23, 0, 'unpaid', $24
+        $1, $2, $3, $4, $5,
+        $6, $7, $8,
+        $9, $10,
+        $11, $12, $13,
+        $14, $15, $16, $17,
+        $18,
+        $19, $20, $21, $22, $23,
+        $24, $25,
+        $26, $27, $28,
+        0, 'unpaid', $29
       )
       RETURNING *`,
       [
         tenantId,
-        data.providerId || null,
-        data.supplierId || null,
+        data.providerConnectionId || null,
+        data.counterpartyId || null,
+        data.originInvoiceId || null,
+        data.kind,
         data.sourceType,
         data.sourceId,
         data.sourceRaw ? JSON.stringify(data.sourceRaw) : null,
@@ -410,6 +433,9 @@ router.post('/',
         data.phoneContact || null,
         data.description || null,
         data.invoiceType,
+        data.ledgerAccount || null,
+        data.analytic1 || null,
+        data.analytic2 || null,
         data.metadata ? JSON.stringify(data.metadata) : '{}',
       ]
     );
@@ -417,88 +443,6 @@ router.post('/',
     res.status(201).json({
       success: true,
       data: result.rows[0],
-    });
-  })
-);
-
-/**
- * POST /invoices/bulk - Create multiple invoices
- */
-router.post('/bulk',
-  validateBody(z.object({ invoices: z.array(CreateInvoiceSchema).min(1).max(500) })),
-  asyncHandler(async (req: Request, res: Response) => {
-    const tenantId = req.user!.tenantId;
-    const { invoices } = req.body;
-    
-    let inserted = 0;
-    let skipped = 0;
-    const errors: any[] = [];
-    
-    for (const data of invoices) {
-      try {
-        await query(
-          `INSERT INTO invoices (
-            tenant_id, provider_id, supplier_id, source_type, source_id, source_raw,
-            invoice_number, external_reference,
-            invoice_date, due_date, payment_expected_date,
-            amount_excl_vat, vat_amount, amount_incl_vat, currency,
-            payment_method,
-            recipient_name, customer_name, customer_email, email_contact, phone_contact,
-            description, invoice_type, recovery_percent, status, metadata
-          ) VALUES (
-            $1, $2, $3, $4, $5, $6,
-            $7, $8,
-            $9, $10, $11,
-            $12, $13, $14, $15,
-            $16,
-            $17, $18, $19, $20, $21,
-            $22, $23, 0, 'unpaid', $24
-          )
-          ON CONFLICT (tenant_id, source_type, source_id) DO NOTHING`,
-          [
-            tenantId,
-            data.providerId || null,
-            data.supplierId || null,
-            data.sourceType,
-            data.sourceId,
-            data.sourceRaw ? JSON.stringify(data.sourceRaw) : null,
-            data.invoiceNumber || null,
-            data.externalReference || null,
-            data.invoiceDate || null,
-            data.dueDate || null,
-            data.paymentExpectedDate || null,
-            data.amountExclVat,
-            data.vatAmount || null,
-            data.amountInclVat,
-            data.currency,
-            data.paymentMethod || null,
-            data.recipientName || null,
-            data.customerName || null,
-            data.customerEmail || null,
-            data.emailContact || null,
-            data.phoneContact || null,
-            data.description || null,
-            data.invoiceType,
-            data.metadata ? JSON.stringify(data.metadata) : '{}',
-          ]
-        );
-        inserted++;
-      } catch (err: any) {
-        if (err.code === '23505') {
-          skipped++;
-        } else {
-          errors.push({ sourceId: data.sourceId, error: err.message });
-        }
-      }
-    }
-    
-    res.status(201).json({
-      success: true,
-      data: {
-        inserted,
-        skipped,
-        errors: errors.length > 0 ? errors : undefined,
-      },
     });
   })
 );
@@ -518,7 +462,9 @@ router.put('/:id',
     let paramIndex = 1;
     
     const updateableFields = [
-      { key: 'supplierId', column: 'supplier_id' },
+      { key: 'counterpartyId', column: 'counterparty_id' },
+      { key: 'originInvoiceId', column: 'origin_invoice_id' },
+      { key: 'kind', column: 'kind' },
       { key: 'externalReference', column: 'external_reference' },
       { key: 'dueDate', column: 'due_date' },
       { key: 'paymentExpectedDate', column: 'payment_expected_date' },
@@ -527,6 +473,9 @@ router.put('/:id',
       { key: 'emailContact', column: 'email_contact' },
       { key: 'phoneContact', column: 'phone_contact' },
       { key: 'description', column: 'description' },
+      { key: 'ledgerAccount', column: 'ledger_account' },
+      { key: 'analytic1', column: 'analytic_1' },
+      { key: 'analytic2', column: 'analytic_2' },
       { key: 'status', column: 'status' },
       { key: 'metadata', column: 'metadata' },
     ];
@@ -578,16 +527,21 @@ router.delete('/:id', asyncHandler(async (req: Request, res: Response) => {
   const tenantId = req.user!.tenantId;
   const { id } = req.params;
   
-  // Check if invoice has active matches
-  const matchesResult = await query(
-    "SELECT COUNT(*) FROM matches WHERE invoice_id = $1 AND status = 'active'",
+  // Check if invoice has active matches or allocations
+  const activeResult = await query(
+    `SELECT 
+      (SELECT COUNT(*) FROM matches WHERE invoice_id = $1 AND status = 'active') as match_count,
+      (SELECT COUNT(*) FROM invoice_allocations WHERE (credit_invoice_id = $1 OR target_invoice_id = $1) AND status = 'active') as allocation_count
+    `,
     [id]
   );
   
-  if (parseInt(matchesResult.rows[0].count, 10) > 0) {
+  const { match_count, allocation_count } = activeResult.rows[0];
+  
+  if (parseInt(match_count, 10) > 0 || parseInt(allocation_count, 10) > 0) {
     res.status(400).json({
       success: false,
-      error: 'Cannot delete invoice with active matches. Cancel the matches first.',
+      error: 'Cannot delete invoice with active matches or allocations. Cancel them first.',
     });
     return;
   }

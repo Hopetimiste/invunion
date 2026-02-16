@@ -1,11 +1,13 @@
 /**
- * Authentication Middleware
+ * Authentication Middleware - v4.1
+ * Updated to fetch organization and tenant role context from DB
  */
 
 import { Request, Response, NextFunction } from 'express';
 import admin from 'firebase-admin';
 import { AuthUser } from '../types/index.js';
 import { config } from '../config/index.js';
+import { query } from '../config/database.js';
 
 // Initialize Firebase Admin if not already done
 if (!admin.apps.length) {
@@ -16,7 +18,7 @@ if (!admin.apps.length) {
 }
 
 /**
- * Require authentication via Firebase ID token
+ * Require authentication via Firebase ID token (v4.1 - enhanced with DB context)
  */
 export async function requireAuth(
   req: Request,
@@ -37,11 +39,48 @@ export async function requireAuth(
 
     const decoded = await admin.auth().verifyIdToken(match[1]);
 
+    // v4.1: Fetch user context from DB (organization, tenant memberships)
+    const userResult = await query(
+      `SELECT 
+        u.id, 
+        u.organization_id, 
+        u.org_role,
+        u.firebase_uid
+       FROM users u
+       WHERE u.firebase_uid = $1`,
+      [decoded.uid]
+    );
+
+    let organizationId = null;
+    let orgRole = null;
+    let tenantId = decoded.tenantId || null;
+    let tenantRole = null;
+
+    if (userResult.rows.length > 0) {
+      const user = userResult.rows[0];
+      organizationId = user.organization_id;
+      orgRole = user.org_role;
+
+      // If tenantId is set in custom claims, fetch the tenant_member role
+      if (tenantId) {
+        const memberResult = await query(
+          'SELECT role FROM tenant_members WHERE user_id = $1 AND tenant_id = $2',
+          [user.id, tenantId]
+        );
+        if (memberResult.rows.length > 0) {
+          tenantRole = memberResult.rows[0].role;
+        }
+      }
+    }
+
     req.user = {
       uid: decoded.uid,
       email: decoded.email || null,
-      tenantId: decoded.tenantId || null,
-      role: decoded.role || 'user',
+      organizationId,
+      tenantId,
+      orgRole,
+      tenantRole,
+      role: decoded.role || 'user',  // legacy
       claims: decoded,
     } as AuthUser;
 
@@ -159,7 +198,7 @@ export function requireTenantAccess(
 }
 
 /**
- * Optional auth - doesn't fail if no token, just sets user to null
+ * Optional auth - doesn't fail if no token, just sets user to null (v4.1)
  */
 export async function optionalAuth(
   req: Request,
@@ -172,10 +211,47 @@ export async function optionalAuth(
     
     if (match) {
       const decoded = await admin.auth().verifyIdToken(match[1]);
+
+      // v4.1: Fetch user context from DB
+      const userResult = await query(
+        `SELECT 
+          u.id, 
+          u.organization_id, 
+          u.org_role,
+          u.firebase_uid
+         FROM users u
+         WHERE u.firebase_uid = $1`,
+        [decoded.uid]
+      );
+
+      let organizationId = null;
+      let orgRole = null;
+      let tenantId = decoded.tenantId || null;
+      let tenantRole = null;
+
+      if (userResult.rows.length > 0) {
+        const user = userResult.rows[0];
+        organizationId = user.organization_id;
+        orgRole = user.org_role;
+
+        if (tenantId) {
+          const memberResult = await query(
+            'SELECT role FROM tenant_members WHERE user_id = $1 AND tenant_id = $2',
+            [user.id, tenantId]
+          );
+          if (memberResult.rows.length > 0) {
+            tenantRole = memberResult.rows[0].role;
+          }
+        }
+      }
+
       req.user = {
         uid: decoded.uid,
         email: decoded.email || null,
-        tenantId: decoded.tenantId || null,
+        organizationId,
+        tenantId,
+        orgRole,
+        tenantRole,
         role: decoded.role || 'user',
         claims: decoded,
       } as AuthUser;

@@ -1,5 +1,6 @@
 /**
- * Invoice domain types
+ * Invoice domain types (v4.1)
+ * Updated with kind, origin_invoice_id, settled_amount, open_amount
  */
 
 import { BaseEntity, PaginationParams, PaymentMethod } from './api';
@@ -10,11 +11,16 @@ import { BaseEntity, PaginationParams, PaymentMethod } from './api';
 
 export type InvoiceStatus = 'unpaid' | 'partial' | 'paid' | 'cancelled' | 'overdue';
 export type InvoiceType = 'issued' | 'received';
+export type InvoiceKind = 'invoice' | 'credit_note';  // v4.1 NEW
 
 export interface Invoice extends BaseEntity {
-  provider_id: string | null;
-  supplier_id: string | null;
-  supplier_name?: string | null;
+  provider_connection_id: string | null;  // v4.1 (replaces provider_id)
+  counterparty_id: string | null;  // v4.1 (replaces supplier_id)
+  counterparty_name_display?: string | null;  // v4.1 (from join)
+  counterparty_type?: string | null;  // v4.1 (from join)
+  origin_invoice_id: string | null;  // v4.1 NEW (for credit notes)
+  origin_invoice_number?: string | null;  // v4.1 (from join)
+  kind: InvoiceKind;  // v4.1 NEW
   source_type: string;
   source_id: string;
   invoice_number: string | null;
@@ -35,6 +41,12 @@ export interface Invoice extends BaseEntity {
   description: string | null;
   invoice_type: InvoiceType;
   recovery_percent: string;
+  settled_amount: string;  // v4.1 NEW
+  open_amount: string;  // v4.1 NEW
+  // Accounting (v4.1 NEW)
+  ledger_account: string | null;
+  analytic_1: string | null;
+  analytic_2: string | null;
   status: InvoiceStatus;
 }
 
@@ -45,13 +57,15 @@ export interface Invoice extends BaseEntity {
 export interface InvoicesParams extends PaginationParams {
   status?: InvoiceStatus;
   type?: InvoiceType;
+  kind?: InvoiceKind;  // v4.1 NEW
+  counterpartyId?: string;  // v4.1 (replaces supplierId)
   paymentMethod?: PaymentMethod;
   search?: string;
   externalReference?: string;
-  recipientName?: string;
-  supplierId?: string;
-  minRecoveryPercent?: number;
-  maxRecoveryPercent?: number;
+  minRecovery?: number;
+  maxRecovery?: number;
+  hasOpen?: 'true' | 'false';  // v4.1 NEW
+  overdue?: 'true' | 'false';
   startDate?: string;
   endDate?: string;
 }
@@ -59,6 +73,10 @@ export interface InvoicesParams extends PaginationParams {
 export interface CreateInvoiceRequest {
   sourceType?: string;
   sourceId: string;
+  providerConnectionId?: string;  // v4.1
+  counterpartyId?: string;  // v4.1
+  originInvoiceId?: string;  // v4.1 NEW
+  kind?: InvoiceKind;  // v4.1 NEW
   invoiceNumber?: string;
   externalReference?: string;
   invoiceDate?: string;
@@ -76,7 +94,29 @@ export interface CreateInvoiceRequest {
   phoneContact?: string;
   description?: string;
   invoiceType?: InvoiceType;
+  // Accounting (v4.1)
+  ledgerAccount?: string;
+  analytic1?: string;
+  analytic2?: string;
   status?: InvoiceStatus;
-  supplierId?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface UpdateInvoiceRequest {
+  counterpartyId?: string;  // v4.1
+  originInvoiceId?: string;  // v4.1
+  kind?: InvoiceKind;  // v4.1
+  externalReference?: string;
+  dueDate?: string;
+  paymentExpectedDate?: string;
+  paymentMethod?: PaymentMethod;
+  recipientName?: string;
+  emailContact?: string;
+  phoneContact?: string;
+  description?: string;
+  ledgerAccount?: string;  // v4.1
+  analytic1?: string;  // v4.1
+  analytic2?: string;  // v4.1
+  status?: InvoiceStatus;
   metadata?: Record<string, unknown>;
 }

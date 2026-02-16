@@ -11,18 +11,19 @@ const router = Router();
  * Retourne la liste des comptes bancaires à synchroniser
  * Appelé par le workflow N8N toutes les 6h
  * Supporte GoCardless et Tink
+ * v4.1: Updated to use provider_connections table
  */
 router.get('/accounts-to-sync', async (req: Request, res: Response) => {
   try {
     // Récupérer tous les comptes actifs avec leur dernière date de sync
-    // Supporte à la fois GoCardless et Tink via provider_account_id
+    // v4.1: Uses provider_connections instead of bank_connections
     const result = await query(`
       SELECT 
         ba.tenant_id as "tenantId",
         ba.id as "accountId",
         ba.provider,
         ba.provider_account_id as "providerAccountId",
-        bc.provider_connection_id as "connectionId",
+        pc.provider_connection_id as "connectionId",
         ba.bank_name as "bankName",
         ba.iban,
         COALESCE(
@@ -32,10 +33,11 @@ router.get('/accounts-to-sync', async (req: Request, res: Response) => {
         ba.last_sync_at as "lastSyncAt",
         t.name as "tenantName"
       FROM bank_accounts ba
-      JOIN bank_connections bc ON bc.id = ba.connection_id
+      JOIN provider_connections pc ON pc.id = ba.connection_id
       JOIN tenants t ON t.id = ba.tenant_id
       WHERE ba.status = 'active'
-        AND bc.status = 'active'
+        AND pc.status = 'active'
+        AND pc.category = 'banking'
         AND t.status = 'active'
         AND ba.provider_account_id IS NOT NULL
       ORDER BY ba.last_sync_at ASC NULLS FIRST

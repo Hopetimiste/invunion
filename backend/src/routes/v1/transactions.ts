@@ -1,7 +1,7 @@
 /**
- * Transactions routes - v2
- * Updated with new fields: payment_method, payment_context, external_reference,
- * description_original, description_display, supplier_id, added_at, status: unconsidered
+ * Transactions routes - v4.1
+ * Updated with v4.1 schema: direction, flow_type, counterparty_id,
+ * allocated_amount, remaining_amount, accounting fields
  */
 
 import { Router, Request, Response } from 'express';
@@ -21,30 +21,37 @@ router.use(requireAuth);
 // SCHEMAS
 // ============================================
 
+const DirectionEnum = z.enum(['in', 'out']);
+const FlowTypeEnum = z.enum(['payment', 'refund', 'fee', 'chargeback', 'payout', 'direct_debit', 'transfer', 'adjustment', 'other']);
 const PaymentMethodEnum = z.enum(['card', 'transfer', 'direct_debit', 'cash', 'check', 'crypto', 'other']);
 const PaymentContextEnum = z.enum(['CIT', 'MIT', 'recurring', 'one_time', 'refund', 'other']);
 const TransactionStatusEnum = z.enum(['unconsidered', 'unmatched', 'matched', 'ignored', 'pending']);
 
 const ListTransactionsSchema = PaginationSchema.merge(DateRangeSchema).extend({
   status: TransactionStatusEnum.optional(),
+  direction: DirectionEnum.optional(),
+  flowType: FlowTypeEnum.optional(),
   accountId: z.string().uuid().optional(),
-  supplierId: z.string().uuid().optional(),
+  counterpartyId: z.string().uuid().optional(),
   paymentMethod: PaymentMethodEnum.optional(),
   paymentContext: PaymentContextEnum.optional(),
   search: z.string().max(100).optional(),
   externalReference: z.string().max(255).optional(),
+  hasRemaining: z.enum(['true', 'false']).optional(),  // Filter by remaining_amount > 0
 });
 
 const CreateTransactionSchema = z.object({
   // Source
   accountId: z.string().uuid().optional().nullable(),
-  supplierId: z.string().uuid().optional().nullable(),
+  counterpartyId: z.string().uuid().optional().nullable(),
   sourceType: z.enum(['tink', 'gocardless', 'salt_edge', 'plaid', 'csv', 'api', 'manual', 'n8n']).default('api'),
   sourceId: z.string().min(1).max(255),
   sourceRaw: z.record(z.any()).optional().nullable(),
   
-  // Amount
-  amount: z.number(),
+  // Amount (v4.1 - always positive + direction)
+  amount: z.number().positive(),
+  direction: DirectionEnum,
+  flowType: FlowTypeEnum.default('payment'),
   currency: z.string().length(3).default('EUR'),
   
   // Dates
@@ -57,6 +64,10 @@ const CreateTransactionSchema = z.object({
   paymentContext: PaymentContextEnum.optional().nullable(),
   externalReference: z.string().max(255).optional().nullable(),
   
+  // Remittance (v4.1)
+  remittanceInfo: z.string().max(500).optional().nullable(),
+  structuredReference: z.string().max(255).optional().nullable(),
+  
   // Descriptions
   descriptionOriginal: z.string().max(1000).optional().nullable(),
   descriptionDisplay: z.string().max(1000).optional().nullable(),
@@ -67,6 +78,11 @@ const CreateTransactionSchema = z.object({
   counterpartyIban: z.string().max(50).optional().nullable(),
   counterpartyBic: z.string().max(11).optional().nullable(),
   
+  // Accounting (v4.1)
+  ledgerAccount: z.string().max(50).optional().nullable(),
+  analytic1: z.string().max(100).optional().nullable(),
+  analytic2: z.string().max(100).optional().nullable(),
+  
   // Status
   status: TransactionStatusEnum.default('unconsidered'),
   
@@ -76,12 +92,19 @@ const CreateTransactionSchema = z.object({
 
 const UpdateTransactionSchema = z.object({
   // Modifiable fields
-  supplierId: z.string().uuid().optional().nullable(),
+  counterpartyId: z.string().uuid().optional().nullable(),
+  direction: DirectionEnum.optional(),
+  flowType: FlowTypeEnum.optional(),
   paymentMethod: PaymentMethodEnum.optional().nullable(),
   paymentContext: PaymentContextEnum.optional().nullable(),
   externalReference: z.string().max(255).optional().nullable(),
+  remittanceInfo: z.string().max(500).optional().nullable(),
+  structuredReference: z.string().max(255).optional().nullable(),
   descriptionDisplay: z.string().max(1000).optional().nullable(),
   category: z.string().max(100).optional().nullable(),
+  ledgerAccount: z.string().max(50).optional().nullable(),
+  analytic1: z.string().max(100).optional().nullable(),
+  analytic2: z.string().max(100).optional().nullable(),
   status: TransactionStatusEnum.optional(),
   metadata: z.record(z.any()).optional().nullable(),
 });
@@ -89,8 +112,9 @@ const UpdateTransactionSchema = z.object({
 const BulkUpdateSchema = z.object({
   ids: z.array(z.string().uuid()).min(1).max(100),
   status: TransactionStatusEnum.optional(),
-  supplierId: z.string().uuid().optional().nullable(),
+  counterpartyId: z.string().uuid().optional().nullable(),
   category: z.string().max(100).optional().nullable(),
+  ledgerAccount: z.string().max(50).optional().nullable(),
 });
 
 // ============================================
@@ -109,15 +133,18 @@ router.get('/',
       pageSize = 20, 
       sortBy = 'transaction_date', 
       sortOrder = 'desc',
-      status, 
+      status,
+      direction,
+      flowType,
       accountId, 
-      supplierId,
+      counterpartyId,
       paymentMethod,
       paymentContext,
       search, 
       externalReference,
       startDate, 
-      endDate 
+      endDate,
+      hasRemaining,
     } = req.query as any;
     
     const offset = (page - 1) * pageSize;
@@ -131,14 +158,24 @@ router.get('/',
       params.push(status);
     }
     
+    if (direction) {
+      whereClause += ` AND t.direction = $${paramIndex++}`;
+      params.push(direction);
+    }
+    
+    if (flowType) {
+      whereClause += ` AND t.flow_type = $${paramIndex++}`;
+      params.push(flowType);
+    }
+    
     if (accountId) {
       whereClause += ` AND t.account_id = $${paramIndex++}`;
       params.push(accountId);
     }
     
-    if (supplierId) {
-      whereClause += ` AND t.supplier_id = $${paramIndex++}`;
-      params.push(supplierId);
+    if (counterpartyId) {
+      whereClause += ` AND t.counterparty_id = $${paramIndex++}`;
+      params.push(counterpartyId);
     }
     
     if (paymentMethod) {
@@ -156,11 +193,16 @@ router.get('/',
       params.push(externalReference);
     }
     
+    if (hasRemaining === 'true') {
+      whereClause += ` AND t.remaining_amount > 0`;
+    }
+    
     if (search) {
       whereClause += ` AND (
         t.description_display ILIKE $${paramIndex} OR 
         t.description_original ILIKE $${paramIndex} OR 
         t.counterparty_name ILIKE $${paramIndex} OR
+        t.counterparty_name_normalized ILIKE $${paramIndex} OR
         t.external_reference ILIKE $${paramIndex}
       )`;
       params.push(`%${search}%`);
@@ -178,7 +220,7 @@ router.get('/',
     }
     
     // Allowed sort columns
-    const allowedSortColumns = ['transaction_date', 'amount', 'added_at', 'booking_date', 'status'];
+    const allowedSortColumns = ['transaction_date', 'amount', 'added_at', 'booking_date', 'status', 'remaining_amount'];
     const orderColumn = 't.' + (allowedSortColumns.includes(sortBy) ? sortBy : 'transaction_date');
     const orderDir = sortOrder === 'asc' ? 'ASC' : 'DESC';
     
@@ -189,11 +231,11 @@ router.get('/',
     );
     const total = parseInt(countResult.rows[0].count, 10);
     
-    // Get transactions with supplier info
+    // Get transactions with counterparty info
     const result = await query<Transaction>(
-      `SELECT t.*, s.name as supplier_name
+      `SELECT t.*, c.name as counterparty_name_display, c.type as counterparty_type
        FROM transactions t
-       LEFT JOIN suppliers s ON t.supplier_id = s.id
+       LEFT JOIN counterparties c ON t.counterparty_id = c.id
        ${whereClause} 
        ORDER BY ${orderColumn} ${orderDir} 
        LIMIT $${paramIndex++} OFFSET $${paramIndex}`,
@@ -227,10 +269,14 @@ router.get('/stats', asyncHandler(async (req: Request, res: Response) => {
       COUNT(*) FILTER (WHERE status = 'matched') as matched,
       COUNT(*) FILTER (WHERE status = 'ignored') as ignored,
       COUNT(*) FILTER (WHERE status = 'pending') as pending,
-      SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END) as total_credit,
-      SUM(CASE WHEN amount < 0 THEN ABS(amount) ELSE 0 END) as total_debit,
+      COUNT(*) FILTER (WHERE direction = 'in') as total_in,
+      COUNT(*) FILTER (WHERE direction = 'out') as total_out,
+      SUM(CASE WHEN direction = 'in' THEN amount ELSE 0 END) as sum_in,
+      SUM(CASE WHEN direction = 'out' THEN amount ELSE 0 END) as sum_out,
+      SUM(remaining_amount) as total_remaining,
+      COUNT(*) FILTER (WHERE remaining_amount > 0) as with_remaining,
       COUNT(DISTINCT payment_method) as payment_methods_count,
-      COUNT(DISTINCT supplier_id) as suppliers_count
+      COUNT(DISTINCT counterparty_id) as counterparties_count
     FROM transactions 
     WHERE tenant_id = $1
   `, [tenantId]);
@@ -249,9 +295,12 @@ router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
   
   const result = await query<Transaction>(
-    `SELECT t.*, s.name as supplier_name
+    `SELECT t.*, 
+      c.name as counterparty_name_display, 
+      c.type as counterparty_type,
+      c.category as counterparty_category
      FROM transactions t
-     LEFT JOIN suppliers s ON t.supplier_id = s.id
+     LEFT JOIN counterparties c ON t.counterparty_id = c.id
      WHERE t.id = $1 AND t.tenant_id = $2`,
     [id, tenantId]
   );
@@ -262,7 +311,7 @@ router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
   
   // Get associated matches
   const matchesResult = await query(
-    `SELECT m.*, i.invoice_number, i.amount_incl_vat as invoice_amount
+    `SELECT m.*, i.invoice_number, i.amount_incl_vat as invoice_amount, i.kind as invoice_kind
      FROM matches m
      LEFT JOIN invoices i ON m.invoice_id = i.id
      WHERE m.transaction_id = $1 AND m.status = 'active'`,
@@ -287,31 +336,45 @@ router.post('/',
     const tenantId = req.user!.tenantId;
     const data = req.body;
     
+    // Normalize counterparty name if provided
+    let normalizedName = null;
+    if (data.counterpartyName) {
+      normalizedName = data.counterpartyName
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9àâäéèêëïîôùûüÿç\s]/gi, '')
+        .replace(/\s+/g, ' ');
+    }
+    
     const result = await query<Transaction>(
       `INSERT INTO transactions (
-        tenant_id, account_id, supplier_id, source_type, source_id, source_raw,
-        amount, currency, transaction_date, booking_date, value_date,
+        tenant_id, account_id, counterparty_id, 
+        source_type, source_id, source_raw,
+        amount, direction, flow_type, currency, 
+        transaction_date, booking_date, value_date,
         payment_method, payment_context, external_reference,
+        remittance_info, structured_reference,
         description_original, description_display, category,
-        counterparty_name, counterparty_iban, counterparty_bic,
+        counterparty_name, counterparty_name_normalized, 
+        counterparty_iban, counterparty_bic,
+        ledger_account, analytic_1, analytic_2,
         status, metadata
       ) VALUES (
-        $1, $2, $3, $4, $5, $6,
-        $7, $8, $9, $10, $11,
-        $12, $13, $14,
-        $15, $16, $17,
-        $18, $19, $20,
-        $21, $22
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
+        $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25,
+        $26, $27, $28, $29, $30
       )
       RETURNING *`,
       [
         tenantId, 
         data.accountId || null, 
-        data.supplierId || null, 
+        data.counterpartyId || null,
         data.sourceType, 
         data.sourceId, 
         data.sourceRaw ? JSON.stringify(data.sourceRaw) : null,
-        data.amount, 
+        data.amount,
+        data.direction,
+        data.flowType || 'payment',
         data.currency,
         data.transactionDate, 
         data.bookingDate || null, 
@@ -319,12 +382,18 @@ router.post('/',
         data.paymentMethod || null, 
         data.paymentContext || null, 
         data.externalReference || null,
+        data.remittanceInfo || null,
+        data.structuredReference || null,
         data.descriptionOriginal || null, 
         data.descriptionDisplay || data.descriptionOriginal || null, 
         data.category || null,
-        data.counterpartyName || null, 
+        data.counterpartyName || null,
+        normalizedName,
         data.counterpartyIban || null, 
         data.counterpartyBic || null,
+        data.ledgerAccount || null,
+        data.analytic1 || null,
+        data.analytic2 || null,
         data.status || 'unconsidered',
         data.metadata ? JSON.stringify(data.metadata) : '{}',
       ]
@@ -352,31 +421,44 @@ router.post('/bulk',
     
     for (const data of transactions) {
       try {
+        let normalizedName = null;
+        if (data.counterpartyName) {
+          normalizedName = data.counterpartyName
+            .toLowerCase()
+            .trim()
+            .replace(/[^a-z0-9àâäéèêëïîôùûüÿç\s]/gi, '')
+            .replace(/\s+/g, ' ');
+        }
+
         await query(
           `INSERT INTO transactions (
-            tenant_id, account_id, supplier_id, source_type, source_id, source_raw,
-            amount, currency, transaction_date, booking_date, value_date,
+            tenant_id, account_id, counterparty_id, 
+            source_type, source_id, source_raw,
+            amount, direction, flow_type, currency, 
+            transaction_date, booking_date, value_date,
             payment_method, payment_context, external_reference,
+            remittance_info, structured_reference,
             description_original, description_display, category,
-            counterparty_name, counterparty_iban, counterparty_bic,
+            counterparty_name, counterparty_name_normalized, 
+            counterparty_iban, counterparty_bic,
+            ledger_account, analytic_1, analytic_2,
             status, metadata
           ) VALUES (
-            $1, $2, $3, $4, $5, $6,
-            $7, $8, $9, $10, $11,
-            $12, $13, $14,
-            $15, $16, $17,
-            $18, $19, $20,
-            $21, $22
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
+            $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25,
+            $26, $27, $28, $29, $30
           )
           ON CONFLICT (tenant_id, source_type, source_id) DO NOTHING`,
           [
             tenantId, 
             data.accountId || null, 
-            data.supplierId || null, 
+            data.counterpartyId || null,
             data.sourceType, 
             data.sourceId, 
             data.sourceRaw ? JSON.stringify(data.sourceRaw) : null,
-            data.amount, 
+            data.amount,
+            data.direction,
+            data.flowType || 'payment',
             data.currency,
             data.transactionDate, 
             data.bookingDate || null, 
@@ -384,12 +466,18 @@ router.post('/bulk',
             data.paymentMethod || null, 
             data.paymentContext || null, 
             data.externalReference || null,
+            data.remittanceInfo || null,
+            data.structuredReference || null,
             data.descriptionOriginal || null, 
             data.descriptionDisplay || data.descriptionOriginal || null, 
             data.category || null,
-            data.counterpartyName || null, 
+            data.counterpartyName || null,
+            normalizedName,
             data.counterpartyIban || null, 
             data.counterpartyBic || null,
+            data.ledgerAccount || null,
+            data.analytic1 || null,
+            data.analytic2 || null,
             data.status || 'unconsidered',
             data.metadata ? JSON.stringify(data.metadata) : '{}',
           ]
@@ -431,12 +519,19 @@ router.put('/:id',
     let paramIndex = 1;
     
     const updateableFields = [
-      { key: 'supplierId', column: 'supplier_id' },
+      { key: 'counterpartyId', column: 'counterparty_id' },
+      { key: 'direction', column: 'direction' },
+      { key: 'flowType', column: 'flow_type' },
       { key: 'paymentMethod', column: 'payment_method' },
       { key: 'paymentContext', column: 'payment_context' },
       { key: 'externalReference', column: 'external_reference' },
+      { key: 'remittanceInfo', column: 'remittance_info' },
+      { key: 'structuredReference', column: 'structured_reference' },
       { key: 'descriptionDisplay', column: 'description_display' },
       { key: 'category', column: 'category' },
+      { key: 'ledgerAccount', column: 'ledger_account' },
+      { key: 'analytic1', column: 'analytic_1' },
+      { key: 'analytic2', column: 'analytic_2' },
       { key: 'status', column: 'status' },
       { key: 'metadata', column: 'metadata' },
     ];
@@ -488,7 +583,7 @@ router.put('/bulk',
   validateBody(BulkUpdateSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const tenantId = req.user!.tenantId;
-    const { ids, status, supplierId, category } = req.body;
+    const { ids, status, counterpartyId, category, ledgerAccount } = req.body;
     
     const fields: string[] = [];
     const values: any[] = [];
@@ -498,13 +593,17 @@ router.put('/bulk',
       fields.push(`status = $${paramIndex++}`);
       values.push(status);
     }
-    if (supplierId !== undefined) {
-      fields.push(`supplier_id = $${paramIndex++}`);
-      values.push(supplierId);
+    if (counterpartyId !== undefined) {
+      fields.push(`counterparty_id = $${paramIndex++}`);
+      values.push(counterpartyId);
     }
     if (category !== undefined) {
       fields.push(`category = $${paramIndex++}`);
       values.push(category);
+    }
+    if (ledgerAccount !== undefined) {
+      fields.push(`ledger_account = $${paramIndex++}`);
+      values.push(ledgerAccount);
     }
     
     if (fields.length === 0) {

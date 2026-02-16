@@ -1,5 +1,5 @@
 /**
- * Service layer exports
+ * Service layer exports (v4.1)
  * Clean interface for all API operations
  */
 
@@ -11,9 +11,9 @@ export type { PaginatedResponse, ApiResponse, RequestOptions } from './api/clien
 export * from './auth';
 export * from './transactions';
 export * from './invoices';
-export * from './suppliers';
+export * from './counterparties';  // v4.1 (replaces suppliers)
 export * from './matches';
-export * from './alerts';
+export * from './organizations';  // v4.1 NEW
+export * from './tenant-members';  // v4.1 NEW
 export * from './admin';
 export * from './banking';
-export * from './reports';

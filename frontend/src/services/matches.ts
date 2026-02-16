@@ -1,5 +1,5 @@
 /**
- * Matches service - handles invoice/transaction matching API calls
+ * Matches service - handles invoice/transaction matching API calls (v4.1)
  */
 
 import { api, buildQueryString, PaginatedResponse } from './api/client';
@@ -19,7 +19,9 @@ export interface Match {
   transaction_id: string | null;
   transaction_type: 'bank' | 'crypto';
   crypto_transaction_id: string | null;
+  psp_event_id: string | null;  // v4.1 NEW
   invoice_id: string | null;
+  invoice_line_id: string | null;  // v4.1 NEW (future-proof)
   matched_amount: string;
   match_type: MatchType;
   confidence_score: string | null;
@@ -30,13 +32,21 @@ export interface Match {
   created_at: string;
   // Joined fields
   transaction_amount?: string;
+  direction?: string;  // v4.1
+  flow_type?: string;  // v4.1
   transaction_description?: string;
   transaction_date?: string;
   counterparty_name?: string;
+  psp_event_type?: string;  // v4.1
+  psp_event_amount?: string;  // v4.1
+  psp_external_id?: string;  // v4.1
   invoice_amount?: string;
   invoice_number?: string;
+  invoice_kind?: string;  // v4.1
   recipient_name?: string;
   invoice_recovery_percent?: string;
+  invoice_settled?: string;  // v4.1
+  invoice_open?: string;  // v4.1
 }
 
 export interface MatchesParams extends PaginationParams {
@@ -45,11 +55,14 @@ export interface MatchesParams extends PaginationParams {
   minConfidence?: number;
   transactionId?: string;
   invoiceId?: string;
+  pspEventId?: string;  // v4.1 NEW
 }
 
 export interface CreateMatchRequest {
-  transactionId: string;
+  transactionId?: string;  // v4.1: optional (xor with pspEventId)
+  pspEventId?: string;  // v4.1 NEW
   invoiceId: string;
+  invoiceLineId?: string;  // v4.1 NEW
   matchedAmount: number;
   confidenceScore?: number;
   notes?: string;

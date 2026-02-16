@@ -1,9 +1,14 @@
 /**
- * Transaction service - handles all transaction API calls
+ * Transaction service - handles all transaction API calls (v4.1)
  */
 
 import { api, buildQueryString, PaginatedResponse } from './api/client';
-import { Transaction, TransactionsParams, CreateTransactionRequest } from '@/types/transaction';
+import { 
+  Transaction, 
+  TransactionsParams, 
+  CreateTransactionRequest,
+  UpdateTransactionRequest  // v4.1
+} from '@/types/transaction';
 
 const ENDPOINT = '/transactions';
 
@@ -20,7 +25,7 @@ export async function createTransaction(data: CreateTransactionRequest): Promise
   return api.post(ENDPOINT, data as unknown as Record<string, unknown>);
 }
 
-export async function updateTransaction(id: string, data: Partial<CreateTransactionRequest>): Promise<Transaction> {
+export async function updateTransaction(id: string, data: UpdateTransactionRequest): Promise<Transaction> {
   return api.put(`${ENDPOINT}/${id}`, data as unknown as Record<string, unknown>);
 }
 
@@ -29,4 +34,9 @@ export async function deleteTransaction(id: string): Promise<void> {
 }
 
 // Re-export types for convenience
-export type { Transaction, TransactionsParams, CreateTransactionRequest };
+export type { 
+  Transaction, 
+  TransactionsParams, 
+  CreateTransactionRequest, 
+  UpdateTransactionRequest 
+};

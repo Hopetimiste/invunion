@@ -1,5 +1,6 @@
 /**
  * API v1 Routes - Main router
+ * Version: 4.1.0
  */
 
 import { Router } from 'express';
@@ -7,14 +8,14 @@ import healthRoutes from './health.js';
 import authRoutes from './auth.js';
 import transactionsRoutes from './transactions.js';
 import invoicesRoutes from './invoices.js';
-import suppliersRoutes from './suppliers.js';
+import counterpartiesRoutes from './counterparties.js';  // v4.1 (replaces suppliers)
 import matchesRoutes from './matches.js';
-import alertsRoutes from './alerts.js';
-import reportsRoutes from './reports.js';
 import ingestRoutes from './ingest.js';
 import connectionsRoutes from './connections.js';
 import adminRoutes from './admin.js';
 import bankingRoutes from './banking.js';
+import organizationsRoutes from './organizations.js';  // v4.1 NEW
+import tenantMembersRoutes from './tenant-members.js';  // v4.1 NEW
 
 const router = Router();
 
@@ -48,58 +49,80 @@ router.post('/signup-tenant',
     const { uid, email } = req.user!;
     const { companyName, firstName, lastName } = req.body;
 
-    // Check if user already has a tenant
+    // Check if user already exists
     const existingUser = await query(
-      'SELECT tenant_id FROM users WHERE firebase_uid = $1',
+      'SELECT id, organization_id FROM users WHERE firebase_uid = $1',
       [uid]
     );
     
     if (existingUser.rows.length > 0) {
-      throw new ValidationError('User already belongs to a tenant');
+      throw new ValidationError('User already exists');
     }
 
-    // Create tenant
+    // v4.1: Create Organization → Tenant → User → TenantMember
+    const organizationId = uuidv4();
     const tenantId = uuidv4();
+    const userId = uuidv4();
+
+    // Generate slug from company name
+    const slug = companyName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+
+    // 1. Create organization
     await query(
-      `INSERT INTO tenants (id, name, plan, status, metadata, created_at, updated_at) 
-       VALUES ($1, $2, 'starter', 'active', '{}', NOW(), NOW())`,
-      [tenantId, companyName]
+      `INSERT INTO organizations (id, name, slug, plan, max_tenants, max_users, status, created_at, updated_at) 
+       VALUES ($1, $2, $3, 'starter', 3, 10, 'active', NOW(), NOW())`,
+      [organizationId, companyName, slug]
     );
 
-    // Create user
-    const userId = uuidv4();
+    // 2. Create tenant
     await query(
-      `INSERT INTO users (id, tenant_id, firebase_uid, email, first_name, last_name, role, metadata, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, 'admin', '{}', NOW(), NOW())`,
-      [userId, tenantId, uid, email, firstName || null, lastName || null]
+      `INSERT INTO tenants (id, organization_id, name, legal_name, plan, status, metadata, created_at, updated_at) 
+       VALUES ($1, $2, $3, $4, 'starter', 'active', '{}', NOW(), NOW())`,
+      [tenantId, organizationId, companyName, companyName]
+    );
+
+    // 3. Create user (owner at org level)
+    await query(
+      `INSERT INTO users (id, organization_id, firebase_uid, email, first_name, last_name, org_role, metadata, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, 'owner', '{}', NOW(), NOW())`,
+      [userId, organizationId, uid, email, firstName || null, lastName || null]
+    );
+
+    // 4. Add user to tenant as admin
+    await query(
+      `INSERT INTO tenant_members (tenant_id, user_id, role, created_at)
+       VALUES ($1, $2, 'admin', NOW())`,
+      [tenantId, userId]
     );
 
     // Set Firebase custom claims
     await admin.auth().setCustomUserClaims(uid, {
+      organizationId,
       tenantId,
       role: 'admin',
     });
 
-    console.log(`[Auth] New tenant created: ${tenantId} for user ${uid}`);
+    console.log(`[Auth] New organization + tenant created: ${organizationId} / ${tenantId} for user ${uid}`);
 
     res.status(201).json({
       success: true,
       data: {
+        organizationId,
         tenantId,
         userId,
-        message: 'Tenant created successfully',
+        message: 'Organization and tenant created successfully',
       },
     });
   })
 );
 
 // Protected routes (require authentication)
+router.use('/organizations', organizationsRoutes);  // v4.1 NEW
+router.use('/tenant-members', tenantMembersRoutes);  // v4.1 NEW
+router.use('/counterparties', counterpartiesRoutes);  // v4.1 (replaces /suppliers)
 router.use('/transactions', transactionsRoutes);
 router.use('/invoices', invoicesRoutes);
-router.use('/suppliers', suppliersRoutes);
 router.use('/matches', matchesRoutes);
-router.use('/alerts', alertsRoutes);
-router.use('/reports', reportsRoutes);
 router.use('/ingest', ingestRoutes);
 router.use('/connections', connectionsRoutes);
 router.use('/banking', bankingRoutes);

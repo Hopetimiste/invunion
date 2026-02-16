@@ -1,9 +1,14 @@
 /**
- * Invoice service - handles all invoice API calls
+ * Invoice service - handles all invoice API calls (v4.1)
  */
 
 import { api, buildQueryString, PaginatedResponse } from './api/client';
-import { Invoice, InvoicesParams, CreateInvoiceRequest } from '@/types/invoice';
+import { 
+  Invoice, 
+  InvoicesParams, 
+  CreateInvoiceRequest,
+  UpdateInvoiceRequest  // v4.1
+} from '@/types/invoice';
 
 const ENDPOINT = '/invoices';
 
@@ -20,7 +25,7 @@ export async function createInvoice(data: CreateInvoiceRequest): Promise<Invoice
   return api.post(ENDPOINT, data as unknown as Record<string, unknown>);
 }
 
-export async function updateInvoice(id: string, data: Partial<CreateInvoiceRequest>): Promise<Invoice> {
+export async function updateInvoice(id: string, data: UpdateInvoiceRequest): Promise<Invoice> {
   return api.put(`${ENDPOINT}/${id}`, data as unknown as Record<string, unknown>);
 }
 
@@ -29,4 +34,9 @@ export async function deleteInvoice(id: string): Promise<void> {
 }
 
 // Re-export types for convenience
-export type { Invoice, InvoicesParams, CreateInvoiceRequest };
+export type { 
+  Invoice, 
+  InvoicesParams, 
+  CreateInvoiceRequest, 
+  UpdateInvoiceRequest 
+};

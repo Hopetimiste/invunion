@@ -1,6 +1,6 @@
 /**
- * Matches routes - Reconciliation matches v2
- * Updated with matched_amount for partial matching and recovery tracking
+ * Matches routes - Reconciliation matches v4.1
+ * Updated with psp_event_id and invoice_line_id (v4.1 schema)
  */
 
 import { Router, Request, Response } from 'express';
@@ -29,19 +29,26 @@ const ListMatchesSchema = PaginationSchema.extend({
   minConfidence: z.coerce.number().min(0).max(100).optional(),
   transactionId: z.string().uuid().optional(),
   invoiceId: z.string().uuid().optional(),
+  pspEventId: z.string().uuid().optional(),  // v4.1
 });
 
 const CreateManualMatchSchema = z.object({
-  transactionId: z.string().uuid(),
+  transactionId: z.string().uuid().nullable().optional(),
+  pspEventId: z.string().uuid().nullable().optional(),  // v4.1 (PSP → Invoice match)
   invoiceId: z.string().uuid(),
-  matchedAmount: z.number().positive(), // Amount being matched (can be partial)
+  invoiceLineId: z.string().uuid().nullable().optional(),  // v4.1 (future-proof)
+  matchedAmount: z.number().positive(),
   confidenceScore: z.number().min(0).max(100).optional(),
   notes: z.string().max(500).optional(),
-});
+}).refine(
+  (data) => data.transactionId || data.pspEventId,
+  { message: 'Either transactionId or pspEventId must be provided' }
+);
 
 const UpdateMatchSchema = z.object({
   status: z.enum(['active', 'cancelled']).optional(),
   matchedAmount: z.number().positive().optional(),
+  invoiceLineId: z.string().uuid().nullable().optional(),  // v4.1
   metadata: z.record(z.any()).optional().nullable(),
 });
 
@@ -99,6 +106,11 @@ router.get('/',
       params.push(invoiceId);
     }
     
+    if (req.query.pspEventId) {
+      whereClause += ` AND m.psp_event_id = $${paramIndex++}`;
+      params.push(req.query.pspEventId);
+    }
+    
     const allowedSortColumns = ['created_at', 'matched_amount', 'confidence_score'];
     const orderColumn = allowedSortColumns.includes(sortBy) ? sortBy : 'created_at';
     const orderDir = sortOrder === 'asc' ? 'ASC' : 'DESC';
@@ -110,21 +122,28 @@ router.get('/',
     );
     const total = parseInt(countResult.rows[0].count, 10);
     
-    // Get matches with related transaction and invoice info
+    // Get matches with related transaction, PSP event, and invoice info
     const result = await query(
       `SELECT 
         m.*,
         t.amount as transaction_amount,
+        t.direction,
+        t.flow_type,
         t.description_display as transaction_description,
         t.transaction_date,
         t.counterparty_name,
         t.payment_method as transaction_payment_method,
+        pe.event_type as psp_event_type,
+        pe.amount as psp_event_amount,
+        pe.external_id as psp_external_id,
         i.amount_incl_vat as invoice_amount,
         i.invoice_number,
+        i.kind as invoice_kind,
         i.recipient_name,
         i.recovery_percent as invoice_recovery_percent
        FROM matches m
        LEFT JOIN transactions t ON m.transaction_id = t.id
+       LEFT JOIN psp_events pe ON m.psp_event_id = pe.id
        LEFT JOIN invoices i ON m.invoice_id = i.id
        ${whereClause}
        ORDER BY m.${orderColumn} ${orderDir}
@@ -185,22 +204,32 @@ router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
     `SELECT 
       m.*,
       t.amount as transaction_amount,
+      t.direction,
+      t.flow_type,
       t.description_display as transaction_description,
       t.description_original,
       t.transaction_date,
       t.counterparty_name,
       t.payment_method as transaction_payment_method,
       t.external_reference as transaction_external_ref,
+      pe.event_type as psp_event_type,
+      pe.amount as psp_event_amount,
+      pe.external_id as psp_external_id,
+      pe.occurred_at as psp_occurred_at,
       i.amount_incl_vat as invoice_amount,
       i.amount_excl_vat,
       i.invoice_number,
+      i.kind as invoice_kind,
       i.recipient_name,
       i.invoice_date,
       i.due_date,
       i.recovery_percent as invoice_recovery_percent,
+      i.settled_amount as invoice_settled,
+      i.open_amount as invoice_open,
       i.status as invoice_status
      FROM matches m
      LEFT JOIN transactions t ON m.transaction_id = t.id
+     LEFT JOIN psp_events pe ON m.psp_event_id = pe.id
      LEFT JOIN invoices i ON m.invoice_id = i.id
      WHERE m.id = $1 AND m.tenant_id = $2`,
     [id, tenantId]
@@ -236,21 +265,33 @@ router.post('/manual',
     );
     const userId = userResult.rows.length > 0 ? userResult.rows[0].id : null;
     
-    const { transactionId, invoiceId, matchedAmount, confidenceScore, notes } = req.body;
+    const { transactionId, pspEventId, invoiceId, invoiceLineId, matchedAmount, confidenceScore, notes } = req.body;
     
-    // Verify transaction exists and belongs to tenant
-    const txResult = await query(
-      'SELECT id, amount, status FROM transactions WHERE id = $1 AND tenant_id = $2',
-      [transactionId, tenantId]
-    );
-    if (txResult.rows.length === 0) {
-      throw new ValidationError('Transaction not found');
+    // v4.1: Verify either transaction or PSP event exists
+    let sourceType = null;
+    if (transactionId) {
+      const txResult = await query(
+        'SELECT id, amount, status FROM transactions WHERE id = $1 AND tenant_id = $2',
+        [transactionId, tenantId]
+      );
+      if (txResult.rows.length === 0) {
+        throw new ValidationError('Transaction not found');
+      }
+      sourceType = 'bank';
+    } else if (pspEventId) {
+      const pspResult = await query(
+        'SELECT id, amount FROM psp_events WHERE id = $1 AND tenant_id = $2',
+        [pspEventId, tenantId]
+      );
+      if (pspResult.rows.length === 0) {
+        throw new ValidationError('PSP event not found');
+      }
+      sourceType = 'bank';  // PSP events still use transaction_type = 'bank' for now
     }
-    const transaction_data = txResult.rows[0];
     
     // Verify invoice exists and belongs to tenant
     const invResult = await query(
-      'SELECT id, amount_incl_vat, recovery_percent, status FROM invoices WHERE id = $1 AND tenant_id = $2',
+      'SELECT id, amount_incl_vat, recovery_percent, status, settled_amount, open_amount FROM invoices WHERE id = $1 AND tenant_id = $2',
       [invoiceId, tenantId]
     );
     if (invResult.rows.length === 0) {
@@ -263,36 +304,51 @@ router.post('/manual',
       throw new ValidationError('Invoice is already fully paid');
     }
     
-    // Validate matched amount doesn't exceed remaining invoice amount
-    const remainingAmount = invoice.amount_incl_vat * (1 - invoice.recovery_percent / 100);
+    // Validate matched amount doesn't exceed remaining invoice amount (v4.1: use open_amount)
+    const remainingAmount = invoice.open_amount || invoice.amount_incl_vat;
     if (matchedAmount > remainingAmount + 0.01) { // Small tolerance for floating point
       throw new ValidationError(`Matched amount (${matchedAmount}) exceeds remaining invoice amount (${remainingAmount.toFixed(2)})`);
     }
     
-    // Check for existing match between this transaction and invoice
+    // Check for existing match
     const existingMatch = await query(
-      'SELECT id FROM matches WHERE transaction_id = $1 AND invoice_id = $2 AND status = $3',
-      [transactionId, invoiceId, 'active']
+      `SELECT id FROM matches 
+       WHERE ((transaction_id = $1 AND $1 IS NOT NULL) OR (psp_event_id = $2 AND $2 IS NOT NULL))
+       AND invoice_id = $3 AND status = 'active'`,
+      [transactionId || null, pspEventId || null, invoiceId]
     );
     if (existingMatch.rows.length > 0) {
-      throw new ValidationError('A match already exists between this transaction and invoice');
+      throw new ValidationError('A match already exists between this source and invoice');
     }
     
-    // Create match - the trigger will automatically update invoice recovery_percent
+    // Create match (v4.1: supports psp_event_id + invoice_line_id)
     const result = await query<Match>(
       `INSERT INTO matches (
-        tenant_id, transaction_id, transaction_type, invoice_id,
+        tenant_id, transaction_id, transaction_type, psp_event_id, invoice_id, invoice_line_id,
         matched_amount, match_type, confidence_score, ai_reasoning, matched_by, status, metadata
-      ) VALUES ($1, $2, 'bank', $3, $4, 'manual', $5, $6, $7, 'active', '{}')
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'manual', $8, $9, $10, 'active', '{}')
       RETURNING *`,
-      [tenantId, transactionId, invoiceId, matchedAmount, confidenceScore || 100, notes, userId]
+      [
+        tenantId, 
+        transactionId || null, 
+        sourceType, 
+        pspEventId || null, 
+        invoiceId, 
+        invoiceLineId || null,
+        matchedAmount, 
+        confidenceScore || 100, 
+        notes, 
+        userId
+      ]
     );
     
-    // Update transaction status
-    await query(
-      'UPDATE transactions SET status = $1, updated_at = NOW() WHERE id = $2',
-      ['matched', transactionId]
-    );
+    // Update source status
+    if (transactionId) {
+      await query(
+        'UPDATE transactions SET status = $1, updated_at = NOW() WHERE id = $2',
+        ['matched', transactionId]
+      );
+    }
     
     // Get updated invoice with new recovery_percent
     const updatedInvoice = await query(

@@ -1,12 +1,13 @@
 /**
  * Type definitions for Invunion API
- * Version: 2.0.0
+ * Version: 4.1.0
+ * Updated: 2026-02-13
  */
 
 import { Request } from 'express';
 
 // ============================================
-// BANKING PROVIDER TYPES
+// PROVIDER TYPES
 // ============================================
 
 /**
@@ -15,9 +16,38 @@ import { Request } from 'express';
 export type BankingProviderType = 'tink' | 'gocardless' | 'salt_edge' | 'plaid';
 
 /**
+ * Supported invoice/accounting providers
+ */
+export type InvoiceProviderType = 'pennylane' | 'stripe' | 'xero' | 'quickbooks';
+
+/**
+ * Provider category
+ */
+export type ProviderCategory = 'banking' | 'invoicing' | 'accounting';
+
+/**
  * Transaction source types - banking providers + manual sources + n8n
  */
 export type TransactionSourceType = BankingProviderType | 'csv' | 'api' | 'manual' | 'n8n';
+
+/**
+ * Transaction direction (v4.1)
+ */
+export type TransactionDirection = 'in' | 'out';
+
+/**
+ * Transaction flow type (v4.1)
+ */
+export type TransactionFlowType = 
+  | 'payment' 
+  | 'refund' 
+  | 'fee' 
+  | 'chargeback' 
+  | 'payout' 
+  | 'direct_debit' 
+  | 'transfer' 
+  | 'adjustment' 
+  | 'other';
 
 /**
  * Payment methods
@@ -39,6 +69,31 @@ export type TransactionStatus = 'unconsidered' | 'unmatched' | 'matched' | 'igno
  */
 export type InvoiceStatus = 'unpaid' | 'partial' | 'paid' | 'cancelled' | 'overdue';
 
+/**
+ * Invoice kind (v4.1)
+ */
+export type InvoiceKind = 'invoice' | 'credit_note';
+
+/**
+ * Counterparty type (v4.1)
+ */
+export type CounterpartyType = 'client' | 'supplier' | 'both';
+
+/**
+ * Counterparty category (v4.1)
+ */
+export type CounterpartyCategory = 'individual' | 'professional' | 'governmental';
+
+/**
+ * Organization role (v4.1)
+ */
+export type OrganizationRole = 'owner' | 'admin' | 'member';
+
+/**
+ * Tenant role (v4.1)
+ */
+export type TenantRole = 'admin' | 'editor' | 'viewer';
+
 // ============================================
 // AUTH TYPES
 // ============================================
@@ -46,8 +101,11 @@ export type InvoiceStatus = 'unpaid' | 'partial' | 'paid' | 'cancelled' | 'overd
 export interface AuthUser {
   uid: string;
   email: string | null;
+  organizationId: string | null;  // v4.1
   tenantId: string | null;
-  role: 'admin' | 'user' | 'superadmin';
+  orgRole: OrganizationRole | null;  // v4.1
+  tenantRole: TenantRole | null;  // v4.1 (from tenant_members)
+  role: 'admin' | 'user' | 'superadmin';  // legacy
   claims: Record<string, any>;
 }
 
@@ -72,12 +130,39 @@ export function assertAuthenticated(req: Request): asserts req is AuthenticatedR
 }
 
 // ============================================
-// DATABASE ENTITY TYPES
+// DATABASE ENTITY TYPES - v4.1
 // ============================================
 
-export interface Tenant {
+/**
+ * Organization (v4.1 - NEW)
+ * Top-level entity grouping multiple tenants
+ */
+export interface Organization {
   id: string;
   name: string;
+  slug: string;
+  plan: 'starter' | 'pro' | 'enterprise';
+  billing_email: string | null;
+  max_tenants: number;
+  max_users: number;
+  settings: Record<string, any>;
+  status: 'active' | 'suspended' | 'cancelled';
+  created_at: Date;
+  updated_at: Date;
+}
+
+/**
+ * Tenant (v4.1 - MODIFIED)
+ * Legal entity / subsidiary
+ */
+export interface Tenant {
+  id: string;
+  organization_id: string;  // v4.1 NEW
+  name: string;
+  legal_name: string | null;  // v4.1 NEW
+  tax_id: string | null;  // v4.1 NEW
+  country: string | null;  // v4.1 NEW (ISO 3166-1 alpha-2)
+  timezone: string;  // v4.1 NEW
   plan: 'starter' | 'pro' | 'business';
   status: 'active' | 'suspended' | 'cancelled';
   metadata: Record<string, any>;
@@ -85,50 +170,105 @@ export interface Tenant {
   updated_at: Date;
 }
 
+/**
+ * User (v4.1 - MODIFIED)
+ * User account (Firebase Auth integration)
+ */
 export interface User {
   id: string;
-  tenant_id: string;
+  organization_id: string;  // v4.1 NEW
   firebase_uid: string;
   email: string;
   first_name: string | null;
   last_name: string | null;
-  role: 'admin' | 'user';
+  org_role: OrganizationRole;  // v4.1 NEW
   metadata: Record<string, any>;
   created_at: Date;
   updated_at: Date;
 }
 
 /**
- * Supplier / Vendor (Fournisseur)
+ * Tenant Member (v4.1 - NEW)
+ * User access to a specific tenant
  */
-export interface Supplier {
-  id: string;
-  tenant_id: string;
-  name: string;
-  email: string | null;
-  phone: string | null;
-  address: string | null;
-  tax_id: string | null;
-  iban: string | null;
-  bic: string | null;
-  payment_terms_days: number;
-  status: 'active' | 'inactive';
-  metadata: Record<string, any>;
-  created_at: Date;
-  updated_at: Date;
-}
-
-/**
- * Bank connection - supports multiple providers
- */
-export interface BankConnection {
+export interface TenantMember {
   id: string;
   tenant_id: string;
   user_id: string;
-  provider: BankingProviderType;
+  role: TenantRole;
+  created_at: Date;
+}
+
+/**
+ * Counterparty (v4.1 - NEW, replaces Supplier + Client)
+ * Unified third-party entity (client, supplier, or both)
+ */
+export interface Counterparty {
+  id: string;
+  tenant_id: string;
+  // Type
+  type: CounterpartyType;
+  // Identity
+  name: string;
+  legal_name: string | null;
+  vat_number: string | null;
+  category: CounterpartyCategory;
+  // External IDs (third-party's own identifiers)
+  external_organization_id: string | null;
+  external_entity_id: string | null;
+  external_service_id: string | null;
+  // Address
+  address: string | null;
+  city: string | null;
+  postal_code: string | null;
+  country: string | null;
+  // Contacts
+  emails: Array<{email: string; label?: string}>;
+  phone: string | null;
+  // References
+  external_reference: string | null;
+  internal_reference: string | null;
+  // Payment
+  payment_terms_days: number;
+  iban: string | null;
+  // Accounting
+  ledger_accounts: Array<{code: string; label?: string}>;
+  analytic_1: string | null;
+  analytic_2: string | null;
+  // Analytics (auto-calculated)
+  payment_score: number;  // 0-100
+  avg_payment_days: number;
+  total_invoiced: number;
+  total_paid: number;
+  last_invoice_date: Date | null;
+  last_payment_date: Date | null;
+  invoice_count: number;
+  outstanding_credit: number;  // v4.1
+  // Status
+  status: 'active' | 'inactive' | 'blocked' | 'prospect';
+  metadata: Record<string, any>;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/**
+ * Provider Connection (v4.1 - NEW, replaces BankConnection + InvoiceProvider)
+ * Unified provider connection (banking, invoicing, accounting)
+ */
+export interface ProviderConnection {
+  id: string;
+  tenant_id: string;
+  user_id: string | null;
+  // Category & Provider
+  category: ProviderCategory;
+  provider: string;  // tink, gocardless, pennylane, stripe, etc.
+  // Credentials (references to Secret Manager)
   provider_connection_id: string | null;
   provider_user_id: string | null;
-  status: 'pending' | 'active' | 'expired' | 'error';
+  api_key_ref: string | null;
+  webhook_secret_ref: string | null;
+  // Lifecycle
+  status: 'pending' | 'active' | 'expired' | 'error' | 'inactive';
   access_expires_at: Date | null;
   last_sync_at: Date | null;
   last_sync_error: string | null;
@@ -138,13 +278,13 @@ export interface BankConnection {
 }
 
 /**
- * Bank account linked to a connection
+ * Bank Account (v4.1 - FK updated to provider_connections)
  */
 export interface BankAccount {
   id: string;
-  connection_id: string;
+  connection_id: string;  // FK → provider_connections
   tenant_id: string;
-  provider: BankingProviderType;
+  provider: string;  // relaxed constraint, any provider
   provider_account_id: string;
   name: string;
   iban: string | null;
@@ -163,43 +303,60 @@ export interface BankAccount {
 }
 
 /**
- * Transaction - unified from multiple sources
+ * Transaction (v4.1 - MODIFIED)
+ * Bank transactions with direction + flow_type
  */
 export interface Transaction {
   id: string;
   tenant_id: string;
   account_id: string | null;
-  supplier_id: string | null;
+  counterparty_id: string | null;  // v4.1 (replaces supplier_id)
   
   // Source info
   source_type: TransactionSourceType;
   source_id: string;
   source_raw: Record<string, any> | null;
   
-  // Amount & Currency
-  amount: number;
+  // Amount & Currency (v4.1 - amount always positive)
+  amount: number;  // v4.1 - always positive
+  direction: TransactionDirection;  // v4.1 NEW
+  flow_type: TransactionFlowType;  // v4.1 NEW
   currency: string;
   
   // Dates
   transaction_date: Date;
   booking_date: Date | null;
   value_date: Date | null;
-  added_at: Date;  // Date d'ajout dans l'application
+  added_at: Date;
   
   // Payment info
   payment_method: PaymentMethod | null;
   payment_context: PaymentContext | null;
-  external_reference: string | null;  // Référence externe (sales order, etc.)
+  external_reference: string | null;
+  
+  // Remittance (v4.1 NEW)
+  remittance_info: string | null;
+  structured_reference: string | null;
   
   // Descriptions
-  description_original: string | null;  // Description originale de la banque
-  description_display: string | null;   // Description affichée (modifiable)
+  description_original: string | null;
+  description_display: string | null;
   category: string | null;
   
   // Counterparty info
   counterparty_name: string | null;
+  counterparty_name_normalized: string | null;  // v4.1 NEW
   counterparty_iban: string | null;
   counterparty_bic: string | null;
+  
+  // Accounting (v4.1 NEW)
+  ledger_account: string | null;
+  analytic_1: string | null;
+  analytic_2: string | null;
+  
+  // Allocation tracking (v4.1 NEW)
+  allocated_amount: number;
+  remaining_amount: number;
   
   // Status
   status: TransactionStatus;
@@ -209,6 +366,177 @@ export interface Transaction {
   updated_at: Date;
 }
 
+/**
+ * Invoice (v4.1 - MODIFIED)
+ * Invoices and credit notes
+ */
+export interface Invoice {
+  id: string;
+  tenant_id: string;
+  provider_connection_id: string | null;  // v4.1 (replaces provider_id)
+  counterparty_id: string | null;  // v4.1 (replaces supplier_id)
+  origin_invoice_id: string | null;  // v4.1 NEW (for credit notes)
+  kind: InvoiceKind;  // v4.1 NEW
+  
+  // Source info
+  source_type: string;
+  source_id: string;
+  source_raw: Record<string, any> | null;
+  
+  // Invoice identification
+  invoice_number: string | null;
+  external_reference: string | null;
+  
+  // Dates
+  invoice_date: Date | null;
+  due_date: Date | null;
+  payment_expected_date: Date | null;
+  
+  // Amounts
+  amount_excl_vat: number;
+  vat_amount: number | null;
+  amount_incl_vat: number;
+  currency: string;
+  
+  // Payment info
+  payment_method: PaymentMethod | null;
+  
+  // Contact info
+  recipient_name: string | null;
+  customer_name: string | null;  // legacy
+  customer_email: string | null;
+  email_contact: string | null;
+  phone_contact: string | null;
+  
+  // Description
+  description: string | null;
+  
+  // Type & Status
+  invoice_type: 'issued' | 'received';
+  recovery_percent: number;  // 0-100
+  settled_amount: number;  // v4.1 NEW
+  open_amount: number;  // v4.1 NEW
+  
+  // Accounting (v4.1 NEW)
+  ledger_account: string | null;
+  analytic_1: string | null;
+  analytic_2: string | null;
+  
+  status: InvoiceStatus;
+  
+  metadata: Record<string, any>;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/**
+ * Match (v4.1 - MODIFIED)
+ */
+export interface Match {
+  id: string;
+  tenant_id: string;
+  transaction_id: string | null;
+  transaction_type: 'bank' | 'crypto';
+  crypto_transaction_id: string | null;
+  psp_event_id: string | null;  // v4.1 NEW
+  invoice_id: string | null;
+  invoice_line_id: string | null;  // v4.1 NEW (future-proof)
+  matched_amount: number | null;
+  match_type: 'ai_auto' | 'manual' | 'rule' | 'n8n';
+  confidence_score: number | null;
+  ai_reasoning: string | null;
+  matched_by: string | null;
+  status: 'active' | 'cancelled';
+  metadata: Record<string, any>;
+  created_at: Date;
+}
+
+/**
+ * Invoice Allocation (v4.1 - NEW)
+ * Credit note ↔ invoice compensation (netting)
+ */
+export interface InvoiceAllocation {
+  id: string;
+  tenant_id: string;
+  credit_invoice_id: string;  // The credit note (kind = 'credit_note')
+  target_invoice_id: string;  // The invoice to credit (kind = 'invoice')
+  applied_amount: number;  // Amount applied (always positive)
+  status: 'active' | 'cancelled';
+  created_by: string | null;
+  metadata: Record<string, any>;
+  created_at: Date;
+}
+
+/**
+ * Invoice Adjustment (v4.1 - NEW)
+ * Bank fees, discounts, rounding, write-offs
+ */
+export interface InvoiceAdjustment {
+  id: string;
+  tenant_id: string;
+  invoice_id: string;
+  amount: number;  // Always positive
+  direction: 'increase' | 'decrease';
+  reason_code: 'bank_fee' | 'discount' | 'rounding' | 'write_off' | 'other';
+  status: 'active' | 'cancelled';
+  created_by: string | null;
+  metadata: Record<string, any>;
+  created_at: Date;
+}
+
+/**
+ * Transaction Relation (v4.1 - NEW)
+ * Links between transactions (chargebacks, reversals, refunds)
+ */
+export interface TransactionRelation {
+  id: string;
+  tenant_id: string;
+  from_transaction_id: string;  // Original transaction
+  to_transaction_id: string;  // Related transaction
+  relation_type: 'reversal' | 'chargeback' | 'refund_of' | 'correction_of';
+  amount: number | null;  // If partial, otherwise NULL
+  metadata: Record<string, any>;
+  created_at: Date;
+}
+
+/**
+ * PSP Event (v4.1 - NEW, V2)
+ * Unified PSP ledger (Stripe, Adyen, etc.)
+ */
+export interface PspEvent {
+  id: string;
+  tenant_id: string;
+  provider_connection_id: string | null;
+  event_type: 'charge' | 'refund' | 'fee' | 'payout' | 'chargeback' | 'adjustment';
+  external_id: string;
+  payment_id: string | null;
+  amount: number;  // Always positive
+  currency: string;
+  occurred_at: Date | null;
+  metadata: Record<string, any>;
+  created_at: Date;
+}
+
+/**
+ * Payout Bank Match (v4.1 - NEW, V2)
+ * Links PSP payout → bank transaction
+ */
+export interface PayoutBankMatch {
+  id: string;
+  tenant_id: string;
+  psp_payout_event_id: string;
+  bank_transaction_id: string;
+  matched_amount: number;  // Always positive
+  match_type: 'auto' | 'manual';
+  confidence_score: number | null;
+  status: 'active' | 'cancelled';
+  metadata: Record<string, any>;
+  created_at: Date;
+}
+
+/**
+ * Crypto Transaction
+ */
 export interface CryptoTransaction {
   id: string;
   tenant_id: string;
@@ -230,109 +558,16 @@ export interface CryptoTransaction {
   created_at: Date;
 }
 
-export interface InvoiceProvider {
-  id: string;
-  tenant_id: string;
-  provider: string;
-  api_key_ref: string | null;
-  webhook_secret_ref: string | null;
-  status: 'active' | 'inactive' | 'error';
-  last_sync_at: Date | null;
-  metadata: Record<string, any>;
-  created_at: Date;
-}
-
 /**
- * Invoice - with recovery tracking
+ * Import Job
  */
-export interface Invoice {
-  id: string;
-  tenant_id: string;
-  provider_id: string | null;
-  supplier_id: string | null;
-  
-  // Source info
-  source_type: string;
-  source_id: string;
-  source_raw: Record<string, any> | null;
-  
-  // Invoice identification
-  invoice_number: string | null;
-  external_reference: string | null;  // Référence externe (PO number, etc.)
-  
-  // Dates
-  invoice_date: Date | null;
-  due_date: Date | null;
-  payment_expected_date: Date | null;
-  
-  // Amounts
-  amount_excl_vat: number;       // Montant HT
-  vat_amount: number | null;     // Montant TVA
-  amount_incl_vat: number;       // Montant TTC
-  currency: string;
-  
-  // Payment info
-  payment_method: PaymentMethod | null;
-  
-  // Contact info
-  recipient_name: string | null;
-  customer_name: string | null;  // Legacy
-  customer_email: string | null;
-  email_contact: string | null;
-  phone_contact: string | null;
-  
-  // Description
-  description: string | null;
-  
-  // Type & Status
-  invoice_type: 'issued' | 'received';
-  recovery_percent: number;  // 0-100, % of amount covered by matched transactions
-  status: InvoiceStatus;
-  
-  metadata: Record<string, any>;
-  created_at: Date;
-  updated_at: Date;
-}
-
-export interface Match {
-  id: string;
-  tenant_id: string;
-  transaction_id: string | null;
-  transaction_type: 'bank' | 'crypto';
-  crypto_transaction_id: string | null;
-  invoice_id: string | null;
-  matched_amount: number | null;  // Amount matched (can be partial)
-  match_type: 'ai_auto' | 'manual' | 'rule' | 'n8n';
-  confidence_score: number | null;
-  ai_reasoning: string | null;
-  matched_by: string | null;
-  status: 'active' | 'cancelled';
-  metadata: Record<string, any>;
-  created_at: Date;
-}
-
-export interface Alert {
-  id: string;
-  tenant_id: string;
-  user_id: string | null;
-  alert_type: 'new_match' | 'low_confidence' | 'anomaly' | 'sync_error' | 'overdue_invoice';
-  title: string;
-  message: string | null;
-  related_match_id: string | null;
-  related_invoice_id: string | null;
-  status: 'unread' | 'read' | 'dismissed';
-  notification_sent: boolean;
-  metadata: Record<string, any>;
-  created_at: Date;
-}
-
 export interface ImportJob {
   id: string;
   tenant_id: string;
   user_id: string;
   file_name: string;
-  file_type: 'transactions' | 'invoices';
-  file_format: 'csv' | 'json';
+  file_type: 'transactions' | 'invoices' | 'counterparties';
+  file_format: 'csv' | 'xlsx' | 'json';
   total_rows: number | null;
   processed_rows: number;
   error_rows: number;
@@ -342,17 +577,6 @@ export interface ImportJob {
   completed_at: Date | null;
   metadata: Record<string, any>;
   created_at: Date;
-}
-
-export interface Report {
-  id: string;
-  tenant_id: string;
-  report_type: string;
-  period_start: Date | null;
-  period_end: Date | null;
-  data: Record<string, any>;
-  metadata: Record<string, any>;
-  generated_at: Date;
 }
 
 // ============================================
@@ -379,6 +603,7 @@ export interface ListParams {
   pageSize?: number;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
+  filters?: Record<string, any>;
 }
 
 // ============================================
@@ -400,20 +625,43 @@ export interface IngestMessage {
   correlationId?: string;
 }
 
+export interface MatchingMessage {
+  type: 'auto_match' | 'reprocess';
+  tenantId: string;
+  payload: {
+    transactionIds?: string[];
+    invoiceIds?: string[];
+  };
+  timestamp: string;
+  correlationId?: string;
+}
+
+export interface AlertMessage {
+  type: 'new_match' | 'sync_error' | 'anomaly' | 'overdue_invoice';
+  tenantId: string;
+  payload: {
+    userId?: string;
+    matchId?: string;
+    invoiceId?: string;
+    title: string;
+    message: string;
+  };
+  timestamp: string;
+}
+
 // ============================================
 // BANKING PROVIDER SPECIFIC TYPES
 // ============================================
 
 /**
  * Normalized transaction from any banking provider
- * Used as intermediate format before storing in DB
  */
 export interface NormalizedBankTransaction {
   externalId: string;
   transactionDate: Date;
   bookingDate: Date;
   valueDate?: Date;
-  amount: number;
+  amount: number;  // Raw amount (can be negative)
   currency: string;
   descriptionOriginal?: string;
   counterpartyName?: string;
@@ -421,6 +669,8 @@ export interface NormalizedBankTransaction {
   counterpartyBic?: string;
   paymentMethod?: PaymentMethod;
   externalReference?: string;
+  remittanceInfo?: string;  // v4.1
+  structuredReference?: string;  // v4.1
   category?: string;
   rawData: Record<string, any>;
 }
@@ -449,28 +699,4 @@ export interface BankingProviderAccount {
   balance?: number;
   bankName?: string;
   bankLogo?: string;
-}
-
-export interface MatchingMessage {
-  type: 'auto_match' | 'reprocess';
-  tenantId: string;
-  payload: {
-    transactionIds?: string[];
-    invoiceIds?: string[];
-  };
-  timestamp: string;
-  correlationId?: string;
-}
-
-export interface AlertMessage {
-  type: 'new_match' | 'sync_error' | 'anomaly' | 'overdue_invoice';
-  tenantId: string;
-  payload: {
-    userId?: string;
-    matchId?: string;
-    invoiceId?: string;
-    title: string;
-    message: string;
-  };
-  timestamp: string;
 }
