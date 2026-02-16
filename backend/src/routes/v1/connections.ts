@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { requireAuth } from '../../middleware/auth.js';
 import { validateBody, validateParams } from '../../middleware/validate.js';
 import { asyncHandler, NotFoundError, AppError, ValidationError } from '../../middleware/errorHandler.js';
-import { BankConnection, BankAccount, BankingProviderType } from '../../types/index.js';
+import { ProviderConnection, BankAccount, BankingProviderType } from '../../types/index.js';
 import { query } from '../../config/database.js';
 import { config, BankingProviders, getEnabledBankingProviders } from '../../config/index.js';
 import { 

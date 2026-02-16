@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { pool } from '../../config/database';
-import { ApiResponse, TenantMember } from '../../types';
+import { pool } from '../../config/database.js';
+import { ApiResponse, TenantMember } from '../../types/index.js';
 
 const router = Router();
 

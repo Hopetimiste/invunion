@@ -2,7 +2,7 @@
  * Tenant Members API service (v4.1)
  */
 
-import { apiClient } from './client';
+import { api } from './api/client';
 import type {
   TenantMember,
   AddTenantMemberRequest,
@@ -14,31 +14,27 @@ const BASE_URL = '/tenant-members';
 /**
  * List all members for current tenant
  */
-export async function getTenantMembers() {
-  const response = await apiClient.get<{ success: boolean; data: TenantMember[] }>(BASE_URL);
-  return response.data.data;
+export async function getTenantMembers(): Promise<TenantMember[]> {
+  return api.get(BASE_URL);
 }
 
 /**
  * Add user to tenant
  */
-export async function addTenantMember(data: AddTenantMemberRequest) {
-  const response = await apiClient.post<{ success: boolean; data: TenantMember }>(BASE_URL, data);
-  return response.data.data;
+export async function addTenantMember(data: AddTenantMemberRequest): Promise<TenantMember> {
+  return api.post(BASE_URL, data as unknown as Record<string, unknown>);
 }
 
 /**
  * Update member role
  */
-export async function updateTenantMember(id: string, data: UpdateTenantMemberRequest) {
-  const response = await apiClient.patch<{ success: boolean; data: TenantMember }>(`${BASE_URL}/${id}`, data);
-  return response.data.data;
+export async function updateTenantMember(id: string, data: UpdateTenantMemberRequest): Promise<TenantMember> {
+  return api.patch(`${BASE_URL}/${id}`, data as unknown as Record<string, unknown>);
 }
 
 /**
  * Remove user from tenant
  */
-export async function removeTenantMember(id: string) {
-  const response = await apiClient.delete<{ success: boolean; message: string }>(`${BASE_URL}/${id}`);
-  return response.data;
+export async function removeTenantMember(id: string): Promise<void> {
+  return api.delete(`${BASE_URL}/${id}`);
 }
