@@ -195,13 +195,13 @@
         <h1>Invunion - Architecture v4</h1>
         <p class="subtitle">Schema Base de Donnees - Version Finale</p>
         <div style="margin-top: 15px;">
-            <span class="badge badge-count">13 Tables</span>
-            <span class="badge badge-new">+2 nouvelles</span>
+            <span class="badge badge-count">18 Tables</span>
+            <span class="badge badge-new">+7 nouvelles</span>
             <span class="badge badge-removed">-6 supprimees</span>
-            <span class="badge badge-changed">3 modifiees</span>
+            <span class="badge badge-changed">5 modifiees</span>
         </div>
         <p style="margin-top: 12px; color: #64748b; font-size: 0.9em;">
-            13 fevrier 2026 &bull; Optimise pour matching IA &bull; Analyse de donnees &bull; Comptabilite
+            13 fevrier 2026 &bull; v4.1 : Reconciliation avancee &bull; Matching IA &bull; Comptabilite &bull; PSP-ready
         </p>
     </div>
 
@@ -224,27 +224,33 @@
                 </ul>
             </div>
             <div class="card card-green">
-                <h4>Tables NOUVELLES (2)</h4>
+                <h4>Tables NOUVELLES (7)</h4>
                 <ul style="list-style: none; padding: 0;">
                     <li style="padding: 6px 0;"><span class="diff-add">counterparties</span> — clients + suppliers unifies</li>
                     <li style="padding: 6px 0;"><span class="diff-add">provider_connections</span> — bank_connections + invoice_providers unifies</li>
+                    <li style="padding: 6px 0;"><span class="diff-add">invoice_allocations</span> — compensation avoir ↔ facture (netting)</li>
+                    <li style="padding: 6px 0;"><span class="diff-add">invoice_adjustments</span> — frais / escompte / write-off</li>
+                    <li style="padding: 6px 0;"><span class="diff-add">transaction_relations</span> — chargebacks / rejets / reversals</li>
+                    <li style="padding: 6px 0;"><span class="diff-add" style="opacity: 0.6;">psp_events</span> — ledger PSP unifie <span class="badge" style="background: rgba(139,92,246,0.25); color: #a78bfa; font-size: 0.7em;">V2</span></li>
+                    <li style="padding: 6px 0;"><span class="diff-add" style="opacity: 0.6;">payout_bank_matches</span> — pont PSP → banque <span class="badge" style="background: rgba(139,92,246,0.25); color: #a78bfa; font-size: 0.7em;">V2</span></li>
                 </ul>
-                <h4 style="margin-top: 15px;">Tables MODIFIEES (3)</h4>
+                <h4 style="margin-top: 15px;">Tables MODIFIEES (5)</h4>
                 <ul style="list-style: none; padding: 0;">
                     <li style="padding: 6px 0;">users — +organization_id, +org_role</li>
-                    <li style="padding: 6px 0;">transactions — +counterparty_id, +champs comptables/IA</li>
-                    <li style="padding: 6px 0;">invoices — +counterparty_id, +champs comptables</li>
+                    <li style="padding: 6px 0;">transactions — +direction, +flow_type, +allocated/remaining_amount</li>
+                    <li style="padding: 6px 0;">invoices — +kind, +origin_invoice_id, +settled/open_amount</li>
+                    <li style="padding: 6px 0;">matches — +psp_event_id, +invoice_line_id</li>
+                    <li style="padding: 6px 0;">counterparties — +outstanding_credit</li>
                 </ul>
             </div>
             <div class="card card-blue">
-                <h4>Tables INCHANGEES (8)</h4>
+                <h4>Tables INCHANGEES (6)</h4>
                 <ul style="list-style: none; padding: 0;">
                     <li style="padding: 6px 0;">organizations</li>
                     <li style="padding: 6px 0;">tenants</li>
                     <li style="padding: 6px 0;">tenant_members</li>
                     <li style="padding: 6px 0;">bank_accounts</li>
                     <li style="padding: 6px 0;">crypto_transactions</li>
-                    <li style="padding: 6px 0;">matches</li>
                     <li style="padding: 6px 0;">import_jobs</li>
                     <li style="padding: 6px 0;">webhook_events</li>
                     <li style="padding: 6px 0;">audit_log</li>
@@ -254,20 +260,20 @@
 
         <div class="stats-row">
             <div class="stat">
-                <div class="stat-number">19→13</div>
+                <div class="stat-number">19→18</div>
                 <div class="stat-label">Tables</div>
             </div>
             <div class="stat">
-                <div class="stat-number">-32%</div>
-                <div class="stat-label">Complexite</div>
+                <div class="stat-number">3 ledgers</div>
+                <div class="stat-label">Banque / Facture / PSP</div>
             </div>
             <div class="stat">
-                <div class="stat-number">1 FK</div>
-                <div class="stat-label">au lieu de 2 (counterparty)</div>
+                <div class="stat-number">4 sources</div>
+                <div class="stat-label">settled_amount (invoice)</div>
             </div>
             <div class="stat">
-                <div class="stat-number">1 JOIN</div>
-                <div class="stat-label">au lieu de 3 (permissions)</div>
+                <div class="stat-number">+ positif</div>
+                <div class="stat-label">montants + direction</div>
             </div>
         </div>
     </div>
@@ -299,7 +305,21 @@ erDiagram
     transactions ||--o{ matches : "matched in"
     invoices ||--o{ matches : "matched in"
     crypto_transactions ||--o{ matches : "matched in"
+    psp_events ||--o{ matches : "PSP charge matched"
     users ||--o{ matches : "created by"
+    invoices ||--o{ invoices : "origin (credit note)"
+    invoices ||--o{ invoice_allocations : "credit applied from"
+    invoices ||--o{ invoice_allocations : "credit applied to"
+    invoices ||--o{ invoice_adjustments : "adjusted by"
+    transactions ||--o{ transaction_relations : "related from"
+    transactions ||--o{ transaction_relations : "related to"
+    tenants ||--o{ psp_events : "has many"
+    provider_connections ||--o{ psp_events : "source of"
+    psp_events ||--o{ payout_bank_matches : "payout matched"
+    transactions ||--o{ payout_bank_matches : "bank side"
+    tenants ||--o{ invoice_allocations : "has many"
+    tenants ||--o{ invoice_adjustments : "has many"
+    tenants ||--o{ transaction_relations : "has many"
 
     organizations {
         uuid id PK
@@ -379,6 +399,7 @@ erDiagram
         int avg_payment_days
         decimal total_invoiced
         decimal total_paid
+        decimal outstanding_credit
         int invoice_count
         string status
     }
@@ -426,8 +447,12 @@ erDiagram
         string source_type
         string source_id UK
         decimal amount
+        string direction
+        string flow_type
         string currency
         date transaction_date
+        date booking_date
+        date value_date
         string payment_method
         string remittance_info
         string structured_reference
@@ -438,6 +463,8 @@ erDiagram
         string ledger_account
         string analytic_1
         string analytic_2
+        decimal allocated_amount
+        decimal remaining_amount
         string status
     }
 
@@ -446,6 +473,8 @@ erDiagram
         uuid tenant_id FK
         uuid provider_connection_id FK
         uuid counterparty_id FK
+        uuid origin_invoice_id FK
+        string kind
         string source_type
         string source_id UK
         jsonb source_raw
@@ -467,6 +496,8 @@ erDiagram
         text description
         string invoice_type
         decimal recovery_percent
+        decimal settled_amount
+        decimal open_amount
         string ledger_account
         string analytic_1
         string analytic_2
@@ -481,12 +512,17 @@ erDiagram
         uuid tenant_id FK
         uuid transaction_id FK
         uuid invoice_id FK
+        uuid crypto_transaction_id FK
+        uuid psp_event_id FK
+        uuid invoice_line_id FK
         decimal matched_amount
         string match_type
         decimal confidence_score
         text ai_reasoning
         uuid matched_by FK
         string status
+        jsonb metadata
+        timestamptz created_at
     }
 
     crypto_transactions {
@@ -536,6 +572,69 @@ erDiagram
         boolean processed
         jsonb payload
         jsonb metadata
+    }
+
+    invoice_allocations {
+        uuid id PK
+        uuid tenant_id FK
+        uuid credit_invoice_id FK
+        uuid target_invoice_id FK
+        decimal applied_amount
+        string status
+        uuid created_by FK
+        jsonb metadata
+        timestamptz created_at
+    }
+
+    invoice_adjustments {
+        uuid id PK
+        uuid tenant_id FK
+        uuid invoice_id FK
+        decimal amount
+        string direction
+        string reason_code
+        string status
+        uuid created_by FK
+        jsonb metadata
+        timestamptz created_at
+    }
+
+    transaction_relations {
+        uuid id PK
+        uuid tenant_id FK
+        uuid from_transaction_id FK
+        uuid to_transaction_id FK
+        string relation_type
+        decimal amount
+        jsonb metadata
+        timestamptz created_at
+    }
+
+    psp_events {
+        uuid id PK
+        uuid tenant_id FK
+        uuid provider_connection_id FK
+        string event_type
+        string external_id UK
+        string payment_id
+        decimal amount
+        string currency
+        timestamptz occurred_at
+        jsonb metadata
+        timestamptz created_at
+    }
+
+    payout_bank_matches {
+        uuid id PK
+        uuid tenant_id FK
+        uuid psp_payout_event_id FK
+        uuid bank_transaction_id FK
+        decimal matched_amount
+        string match_type
+        decimal confidence_score
+        string status
+        jsonb metadata
+        timestamptz created_at
     }
 
     audit_log {
@@ -709,6 +808,7 @@ erDiagram
                     <tr><td>last_invoice_date</td><td class="type-col">DATE</td><td></td><td class="note-col">Derniere facture (auto-calcule)</td></tr>
                     <tr><td>last_payment_date</td><td class="type-col">DATE</td><td></td><td class="note-col">Dernier paiement (auto-calcule)</td></tr>
                     <tr><td>invoice_count</td><td class="type-col">INTEGER</td><td>DEFAULT 0</td><td class="note-col">Nombre de factures (auto-calcule)</td></tr>
+                    <tr class="new-field"><td>outstanding_credit</td><td class="type-col">DECIMAL(15,2)</td><td>DEFAULT 0</td><td class="note-col">NOUVEAU v4.1 — Credit restant (avoirs non consommes, auto-calcule)</td></tr>
                     <tr><td colspan="4" style="background: rgba(139,92,246,0.1); color: #a78bfa; font-weight: 600; padding: 8px 15px;">STATUT & META</td></tr>
                     <tr><td>status</td><td class="type-col">VARCHAR(50)</td><td>DEFAULT 'active'</td><td class="note-col">active / inactive / blocked / prospect</td></tr>
                     <tr><td>metadata</td><td class="type-col">JSONB</td><td>DEFAULT '{}'</td><td class="note-col"></td></tr>
@@ -795,7 +895,7 @@ erDiagram
                 <span class="table-card-name">💳 transactions</span>
                 <span class="badge badge-changed">Modifiee (v4)</span>
             </div>
-            <div class="table-card-desc">Transactions bancaires. 1 seule FK counterparty_id. Champs comptables et matching IA ajoutes.</div>
+            <div class="table-card-desc">Transactions bancaires (ledger cash). amount toujours positif + direction (in/out) + flow_type. Champs comptables et matching IA.</div>
             <table>
                 <thead><tr><th>Champ</th><th>Type</th><th>Contrainte</th><th>Description</th></tr></thead>
                 <tbody>
@@ -806,7 +906,9 @@ erDiagram
                     <tr><td>source_type</td><td class="type-col">VARCHAR(50)</td><td>NOT NULL</td><td class="note-col">tink / gocardless / csv / api / manual / n8n</td></tr>
                     <tr><td>source_id</td><td class="type-col">VARCHAR(255)</td><td>NOT NULL</td><td class="note-col">ID unique source (deduplication)</td></tr>
                     <tr><td>source_raw</td><td class="type-col">JSONB</td><td></td><td class="note-col">Donnees brutes du provider</td></tr>
-                    <tr><td>amount</td><td class="type-col">DECIMAL(15,2)</td><td>NOT NULL</td><td class="note-col">Montant</td></tr>
+                    <tr><td>amount</td><td class="type-col">DECIMAL(15,2)</td><td>NOT NULL, CHECK > 0</td><td class="note-col">Montant (toujours positif)</td></tr>
+                    <tr class="new-field"><td>direction</td><td class="type-col">VARCHAR(10)</td><td>NOT NULL</td><td class="note-col">NOUVEAU v4.1 — in / out</td></tr>
+                    <tr class="new-field"><td>flow_type</td><td class="type-col">VARCHAR(50)</td><td>NOT NULL DEFAULT 'payment'</td><td class="note-col">NOUVEAU v4.1 — payment / refund / fee / chargeback / payout / direct_debit / transfer / adjustment / other</td></tr>
                     <tr><td>currency</td><td class="type-col">VARCHAR(3)</td><td>DEFAULT 'EUR'</td><td class="note-col">Devise</td></tr>
                     <tr><td>transaction_date</td><td class="type-col">DATE</td><td>NOT NULL</td><td class="note-col">Date transaction</td></tr>
                     <tr><td>booking_date</td><td class="type-col">DATE</td><td></td><td class="note-col">Date comptabilisation</td></tr>
@@ -827,6 +929,8 @@ erDiagram
                     <tr class="new-field"><td>ledger_account</td><td class="type-col">VARCHAR(50)</td><td></td><td class="note-col">NOUVEAU v4 — Compte comptable</td></tr>
                     <tr class="new-field"><td>analytic_1</td><td class="type-col">VARCHAR(100)</td><td></td><td class="note-col">NOUVEAU v4 — Axe analytique 1</td></tr>
                     <tr class="new-field"><td>analytic_2</td><td class="type-col">VARCHAR(100)</td><td></td><td class="note-col">NOUVEAU v4 — Axe analytique 2</td></tr>
+                    <tr class="new-field"><td>allocated_amount</td><td class="type-col">DECIMAL(15,2)</td><td>DEFAULT 0</td><td class="note-col">NOUVEAU v4.1 — SUM(matches.matched_amount) auto-calcule</td></tr>
+                    <tr class="new-field"><td>remaining_amount</td><td class="type-col">DECIMAL(15,2)</td><td>DEFAULT 0</td><td class="note-col">NOUVEAU v4.1 — amount - allocated_amount (auto-calcule)</td></tr>
                     <tr><td>status</td><td class="type-col">VARCHAR(50)</td><td>DEFAULT 'unconsidered'</td><td class="note-col">unconsidered / unmatched / matched / ignored / pending</td></tr>
                     <tr><td>metadata</td><td class="type-col">JSONB</td><td>DEFAULT '{}'</td><td class="note-col"></td></tr>
                     <tr><td>created_at</td><td class="type-col">TIMESTAMPTZ</td><td>DEFAULT NOW()</td><td class="note-col"></td></tr>
@@ -842,7 +946,7 @@ erDiagram
                 <span class="table-card-name">📄 invoices</span>
                 <span class="badge badge-changed">Modifiee (v4)</span>
             </div>
-            <div class="table-card-desc">Factures emises et recues. 1 seule FK counterparty_id. Provider via provider_connection_id.</div>
+            <div class="table-card-desc">Factures et avoirs (kind: invoice/credit_note). Direction : invoice_type (issued/received). settled_amount et open_amount auto-calcules.</div>
             <table>
                 <thead><tr><th>Champ</th><th>Type</th><th>Contrainte</th><th>Description</th></tr></thead>
                 <tbody>
@@ -850,6 +954,8 @@ erDiagram
                     <tr><td>tenant_id</td><td class="type-col">UUID</td><td class="fk">FK → tenants CASCADE</td><td class="note-col"></td></tr>
                     <tr class="new-field"><td>provider_connection_id</td><td class="type-col">UUID</td><td class="fk">FK → provider_connections SET NULL</td><td class="note-col">NOUVEAU v4 — remplace provider_id → invoice_providers</td></tr>
                     <tr class="new-field"><td>counterparty_id</td><td class="type-col">UUID</td><td class="fk">FK → counterparties SET NULL</td><td class="note-col">NOUVEAU v4 — remplace supplier_id + client_id</td></tr>
+                    <tr class="new-field"><td>origin_invoice_id</td><td class="type-col">UUID</td><td class="fk">FK → invoices SET NULL</td><td class="note-col">NOUVEAU v4.1 — Facture d'origine (pour avoirs). NULL = avoir global</td></tr>
+                    <tr class="new-field"><td>kind</td><td class="type-col">VARCHAR(50)</td><td>NOT NULL DEFAULT 'invoice'</td><td class="note-col">NOUVEAU v4.1 — invoice / credit_note</td></tr>
                     <tr><td>source_type</td><td class="type-col">VARCHAR(50)</td><td>NOT NULL</td><td class="note-col">pennylane / stripe / csv / api / manual</td></tr>
                     <tr><td>source_id</td><td class="type-col">VARCHAR(255)</td><td>NOT NULL</td><td class="note-col">ID unique source</td></tr>
                     <tr><td>source_raw</td><td class="type-col">JSONB</td><td></td><td class="note-col">Donnees brutes</td></tr>
@@ -871,6 +977,8 @@ erDiagram
                     <tr><td>description</td><td class="type-col">TEXT</td><td></td><td class="note-col">Description</td></tr>
                     <tr><td>invoice_type</td><td class="type-col">VARCHAR(50)</td><td>DEFAULT 'issued'</td><td class="note-col">issued (emise) / received (recue)</td></tr>
                     <tr><td>recovery_percent</td><td class="type-col">DECIMAL(5,2)</td><td>DEFAULT 0, CHECK 0-100</td><td class="note-col">% recouvrement (auto-calcule)</td></tr>
+                    <tr class="new-field"><td>settled_amount</td><td class="type-col">DECIMAL(15,2)</td><td>DEFAULT 0</td><td class="note-col">NOUVEAU v4.1 — matches + allocations + adjustments (auto-calcule)</td></tr>
+                    <tr class="new-field"><td>open_amount</td><td class="type-col">DECIMAL(15,2)</td><td>DEFAULT 0</td><td class="note-col">NOUVEAU v4.1 — amount_incl_vat - settled_amount (auto-calcule)</td></tr>
                     <tr class="new-field"><td>ledger_account</td><td class="type-col">VARCHAR(50)</td><td></td><td class="note-col">NOUVEAU v4 — Compte comptable</td></tr>
                     <tr class="new-field"><td>analytic_1</td><td class="type-col">VARCHAR(100)</td><td></td><td class="note-col">NOUVEAU v4 — Axe analytique 1</td></tr>
                     <tr class="new-field"><td>analytic_2</td><td class="type-col">VARCHAR(100)</td><td></td><td class="note-col">NOUVEAU v4 — Axe analytique 2</td></tr>
@@ -887,9 +995,9 @@ erDiagram
         <div class="table-card">
             <div class="table-card-header">
                 <span class="table-card-name">🤝 matches</span>
-                <span class="badge badge-kept">Inchangee</span>
+                <span class="badge badge-changed">Modifiee (v4.1)</span>
             </div>
-            <div class="table-card-desc">Rapprochements transaction ↔ facture. Coeur du systeme de reconciliation.</div>
+            <div class="table-card-desc">Rapprochements transaction/PSP ↔ facture. Coeur du systeme de reconciliation. matched_amount toujours positif.</div>
             <table>
                 <thead><tr><th>Champ</th><th>Type</th><th>Contrainte</th><th>Description</th></tr></thead>
                 <tbody>
@@ -898,8 +1006,10 @@ erDiagram
                     <tr><td>transaction_id</td><td class="type-col">UUID</td><td class="fk">FK → transactions CASCADE</td><td class="note-col"></td></tr>
                     <tr><td>transaction_type</td><td class="type-col">VARCHAR(50)</td><td>DEFAULT 'bank'</td><td class="note-col">bank / crypto</td></tr>
                     <tr><td>crypto_transaction_id</td><td class="type-col">UUID</td><td class="fk">FK → crypto_transactions CASCADE</td><td class="note-col"></td></tr>
+                    <tr class="new-field"><td>psp_event_id</td><td class="type-col">UUID</td><td class="fk">FK → psp_events SET NULL</td><td class="note-col">NOUVEAU v4.1 — PSP charge/refund (V2). CHECK: au moins 1 parmi transaction_id/crypto_transaction_id/psp_event_id</td></tr>
                     <tr><td>invoice_id</td><td class="type-col">UUID</td><td class="fk">FK → invoices CASCADE</td><td class="note-col"></td></tr>
-                    <tr><td>matched_amount</td><td class="type-col">DECIMAL(15,2)</td><td></td><td class="note-col">Montant rapproche (partiel OK)</td></tr>
+                    <tr class="new-field"><td>invoice_line_id</td><td class="type-col">UUID</td><td></td><td class="note-col">NOUVEAU v4.1 — Future-proof: matching au niveau ligne (V2). NULL pour l'instant</td></tr>
+                    <tr><td>matched_amount</td><td class="type-col">DECIMAL(15,2)</td><td>CHECK > 0</td><td class="note-col">Montant rapproche (toujours positif, partiel OK)</td></tr>
                     <tr><td>match_type</td><td class="type-col">VARCHAR(50)</td><td>NOT NULL</td><td class="note-col">ai_auto / manual / rule / n8n</td></tr>
                     <tr><td>confidence_score</td><td class="type-col">DECIMAL(5,2)</td><td></td><td class="note-col">Score de confiance 0-100</td></tr>
                     <tr><td>ai_reasoning</td><td class="type-col">TEXT</td><td></td><td class="note-col">Explication de l'IA</td></tr>
@@ -996,6 +1106,130 @@ erDiagram
             <div class="unique-box">UNIQUE(event_id)</div>
         </div>
 
+        <!-- INVOICE ALLOCATIONS -->
+        <div class="table-card" style="border: 2px solid rgba(16,185,129,0.4);">
+            <div class="table-card-header">
+                <span class="table-card-name">🔄 invoice_allocations</span>
+                <span class="badge badge-new">NOUVELLE v4.1</span>
+            </div>
+            <div class="table-card-desc">Compensation avoir ↔ facture sans transaction bancaire. Couvre le netting, les avoirs globaux, et les avoirs sans remboursement.</div>
+            <table>
+                <thead><tr><th>Champ</th><th>Type</th><th>Contrainte</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td>id</td><td class="type-col">UUID</td><td class="pk">PK</td><td class="note-col"></td></tr>
+                    <tr><td>tenant_id</td><td class="type-col">UUID</td><td class="fk">FK → tenants CASCADE</td><td class="note-col"></td></tr>
+                    <tr><td>credit_invoice_id</td><td class="type-col">UUID</td><td class="fk">FK → invoices CASCADE</td><td class="note-col">L'avoir (kind = credit_note)</td></tr>
+                    <tr><td>target_invoice_id</td><td class="type-col">UUID</td><td class="fk">FK → invoices CASCADE</td><td class="note-col">La facture a crediter (kind = invoice)</td></tr>
+                    <tr><td>applied_amount</td><td class="type-col">DECIMAL(15,2)</td><td>CHECK > 0</td><td class="note-col">Montant applique (toujours positif)</td></tr>
+                    <tr><td>status</td><td class="type-col">VARCHAR(50)</td><td>DEFAULT 'active'</td><td class="note-col">active / cancelled</td></tr>
+                    <tr><td>created_by</td><td class="type-col">UUID</td><td class="fk">FK → users SET NULL</td><td class="note-col">Utilisateur ayant cree l'allocation</td></tr>
+                    <tr><td>metadata</td><td class="type-col">JSONB</td><td>DEFAULT '{}'</td><td class="note-col"></td></tr>
+                    <tr><td>created_at</td><td class="type-col">TIMESTAMPTZ</td><td>DEFAULT NOW()</td><td class="note-col"></td></tr>
+                </tbody>
+            </table>
+            <div class="unique-box">Contrainte: SUM(applied_amount WHERE status='active') &lt;= credit_note.amount_incl_vat (trigger)</div>
+        </div>
+
+        <!-- INVOICE ADJUSTMENTS -->
+        <div class="table-card" style="border: 2px solid rgba(16,185,129,0.4);">
+            <div class="table-card-header">
+                <span class="table-card-name">⚖️ invoice_adjustments</span>
+                <span class="badge badge-new">NOUVELLE v4.1</span>
+            </div>
+            <div class="table-card-desc">Frais bancaires, escompte, arrondis, write-off. Permet de fermer une facture meme si le montant recu differe.</div>
+            <table>
+                <thead><tr><th>Champ</th><th>Type</th><th>Contrainte</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td>id</td><td class="type-col">UUID</td><td class="pk">PK</td><td class="note-col"></td></tr>
+                    <tr><td>tenant_id</td><td class="type-col">UUID</td><td class="fk">FK → tenants CASCADE</td><td class="note-col"></td></tr>
+                    <tr><td>invoice_id</td><td class="type-col">UUID</td><td class="fk">FK → invoices CASCADE</td><td class="note-col">Facture ajustee</td></tr>
+                    <tr><td>amount</td><td class="type-col">DECIMAL(15,2)</td><td>CHECK > 0</td><td class="note-col">Montant de l'ajustement (toujours positif)</td></tr>
+                    <tr><td>direction</td><td class="type-col">VARCHAR(10)</td><td>NOT NULL</td><td class="note-col">increase / decrease</td></tr>
+                    <tr><td>reason_code</td><td class="type-col">VARCHAR(50)</td><td>NOT NULL</td><td class="note-col">bank_fee / discount / rounding / write_off / other</td></tr>
+                    <tr><td>status</td><td class="type-col">VARCHAR(50)</td><td>DEFAULT 'active'</td><td class="note-col">active / cancelled</td></tr>
+                    <tr><td>created_by</td><td class="type-col">UUID</td><td class="fk">FK → users SET NULL</td><td class="note-col">Utilisateur ou NULL si auto</td></tr>
+                    <tr><td>metadata</td><td class="type-col">JSONB</td><td>DEFAULT '{}'</td><td class="note-col"></td></tr>
+                    <tr><td>created_at</td><td class="type-col">TIMESTAMPTZ</td><td>DEFAULT NOW()</td><td class="note-col"></td></tr>
+                </tbody>
+            </table>
+            <div class="warn-box">
+                <strong style="color: #fbbf24;">Exemple :</strong> Facture 1000€, paiement recu 995€ → adjustment de 5€ (direction: decrease, reason: bank_fee) → settled = 995 + 5 = 1000€ → facture "paid"
+            </div>
+        </div>
+
+        <!-- TRANSACTION RELATIONS -->
+        <div class="table-card" style="border: 2px solid rgba(16,185,129,0.4);">
+            <div class="table-card-header">
+                <span class="table-card-name">🔗 transaction_relations</span>
+                <span class="badge badge-new">NOUVELLE v4.1</span>
+            </div>
+            <div class="table-card-desc">Liens entre transactions bancaires : chargeback ↔ paiement, rejet ↔ prelevement, correction ↔ original. Audit clair.</div>
+            <table>
+                <thead><tr><th>Champ</th><th>Type</th><th>Contrainte</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td>id</td><td class="type-col">UUID</td><td class="pk">PK</td><td class="note-col"></td></tr>
+                    <tr><td>tenant_id</td><td class="type-col">UUID</td><td class="fk">FK → tenants CASCADE</td><td class="note-col"></td></tr>
+                    <tr><td>from_transaction_id</td><td class="type-col">UUID</td><td class="fk">FK → transactions CASCADE</td><td class="note-col">Transaction d'origine (ex: paiement)</td></tr>
+                    <tr><td>to_transaction_id</td><td class="type-col">UUID</td><td class="fk">FK → transactions CASCADE</td><td class="note-col">Transaction liee (ex: chargeback)</td></tr>
+                    <tr><td>relation_type</td><td class="type-col">VARCHAR(50)</td><td>NOT NULL</td><td class="note-col">reversal / chargeback / refund_of / correction_of</td></tr>
+                    <tr><td>amount</td><td class="type-col">DECIMAL(15,2)</td><td></td><td class="note-col">Montant (si partiel, sinon NULL = total)</td></tr>
+                    <tr><td>metadata</td><td class="type-col">JSONB</td><td>DEFAULT '{}'</td><td class="note-col"></td></tr>
+                    <tr><td>created_at</td><td class="type-col">TIMESTAMPTZ</td><td>DEFAULT NOW()</td><td class="note-col"></td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- PSP EVENTS (V2) -->
+        <div class="table-card" style="border: 2px solid rgba(139,92,246,0.4);">
+            <div class="table-card-header">
+                <span class="table-card-name">💳 psp_events</span>
+                <span class="badge" style="background: rgba(139,92,246,0.25); color: #a78bfa; border: 1px solid rgba(139,92,246,0.4);">V2 — schema pret, dev plus tard</span>
+            </div>
+            <div class="table-card-desc">Ledger PSP unifie. Verite "acquéreur" (Stripe, Adyen, GoCardless...) : charges, refunds, fees, payouts. Independant de la banque.</div>
+            <table>
+                <thead><tr><th>Champ</th><th>Type</th><th>Contrainte</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td>id</td><td class="type-col">UUID</td><td class="pk">PK</td><td class="note-col"></td></tr>
+                    <tr><td>tenant_id</td><td class="type-col">UUID</td><td class="fk">FK → tenants CASCADE</td><td class="note-col"></td></tr>
+                    <tr><td>provider_connection_id</td><td class="type-col">UUID</td><td class="fk">FK → provider_connections SET NULL</td><td class="note-col">Connexion PSP source</td></tr>
+                    <tr><td>event_type</td><td class="type-col">VARCHAR(50)</td><td>NOT NULL</td><td class="note-col">charge / refund / fee / payout / chargeback / adjustment</td></tr>
+                    <tr><td>external_id</td><td class="type-col">VARCHAR(255)</td><td>NOT NULL</td><td class="note-col">ID unique chez le PSP (idempotence)</td></tr>
+                    <tr><td>payment_id</td><td class="type-col">VARCHAR(255)</td><td></td><td class="note-col">Reference paiement (regrouper charge+refund+fee d'un meme paiement)</td></tr>
+                    <tr><td>amount</td><td class="type-col">DECIMAL(15,2)</td><td>NOT NULL, CHECK > 0</td><td class="note-col">Montant (toujours positif)</td></tr>
+                    <tr><td>currency</td><td class="type-col">VARCHAR(3)</td><td>DEFAULT 'EUR'</td><td class="note-col">Devise</td></tr>
+                    <tr><td>occurred_at</td><td class="type-col">TIMESTAMPTZ</td><td></td><td class="note-col">Date/heure de l'evenement PSP</td></tr>
+                    <tr><td>metadata</td><td class="type-col">JSONB</td><td>DEFAULT '{}'</td><td class="note-col">payment_method, scheme, merchant_account, etc.</td></tr>
+                    <tr><td>created_at</td><td class="type-col">TIMESTAMPTZ</td><td>DEFAULT NOW()</td><td class="note-col"></td></tr>
+                </tbody>
+            </table>
+            <div class="unique-box">UNIQUE(tenant_id, provider_connection_id, external_id)</div>
+        </div>
+
+        <!-- PAYOUT BANK MATCHES (V2) -->
+        <div class="table-card" style="border: 2px solid rgba(139,92,246,0.4);">
+            <div class="table-card-header">
+                <span class="table-card-name">🏦 payout_bank_matches</span>
+                <span class="badge" style="background: rgba(139,92,246,0.25); color: #a78bfa; border: 1px solid rgba(139,92,246,0.4);">V2 — schema pret, dev plus tard</span>
+            </div>
+            <div class="table-card-desc">Pont PSP → Banque. Relie un payout PSP a la transaction bancaire correspondante. Permet de calculer le cash recu par periode/acquéreur.</div>
+            <table>
+                <thead><tr><th>Champ</th><th>Type</th><th>Contrainte</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td>id</td><td class="type-col">UUID</td><td class="pk">PK</td><td class="note-col"></td></tr>
+                    <tr><td>tenant_id</td><td class="type-col">UUID</td><td class="fk">FK → tenants CASCADE</td><td class="note-col"></td></tr>
+                    <tr><td>psp_payout_event_id</td><td class="type-col">UUID</td><td class="fk">FK → psp_events CASCADE</td><td class="note-col">Event payout PSP</td></tr>
+                    <tr><td>bank_transaction_id</td><td class="type-col">UUID</td><td class="fk">FK → transactions CASCADE</td><td class="note-col">Transaction bancaire correspondante</td></tr>
+                    <tr><td>matched_amount</td><td class="type-col">DECIMAL(15,2)</td><td>CHECK > 0</td><td class="note-col">Montant rapproche (toujours positif)</td></tr>
+                    <tr><td>match_type</td><td class="type-col">VARCHAR(50)</td><td>DEFAULT 'auto'</td><td class="note-col">auto / manual</td></tr>
+                    <tr><td>confidence_score</td><td class="type-col">DECIMAL(5,2)</td><td></td><td class="note-col">Score de confiance 0-100</td></tr>
+                    <tr><td>status</td><td class="type-col">VARCHAR(50)</td><td>DEFAULT 'active'</td><td class="note-col">active / cancelled</td></tr>
+                    <tr><td>metadata</td><td class="type-col">JSONB</td><td>DEFAULT '{}'</td><td class="note-col"></td></tr>
+                    <tr><td>created_at</td><td class="type-col">TIMESTAMPTZ</td><td>DEFAULT NOW()</td><td class="note-col"></td></tr>
+                </tbody>
+            </table>
+            <div class="unique-box">Contrainte: SUM(matched_amount) &lt;= psp_payout.amount ET SUM(matched_amount) &lt;= bank_transaction.amount (trigger)</div>
+        </div>
+
         <!-- AUDIT LOG -->
         <div class="table-card" style="border: 2px solid rgba(59,130,246,0.4);">
             <div class="table-card-header">
@@ -1029,23 +1263,47 @@ erDiagram
         <h2>🔄 Triggers Auto-Calcules</h2>
         <div class="grid-2">
             <div class="card card-purple">
-                <h4>update_invoice_recovery()</h4>
-                <p style="color: #94a3b8; margin: 10px 0;">Declencheur : INSERT / UPDATE / DELETE sur <code>matches</code></p>
-                <p style="color: #cbd5e1;">Recalcule sur <code>invoices</code> :</p>
+                <h4>update_invoice_settled() <span class="badge badge-new">v4.1</span></h4>
+                <p style="color: #94a3b8; margin: 10px 0;">Declencheur : INSERT / UPDATE / DELETE sur <code>matches</code>, <code>invoice_allocations</code>, <code>invoice_adjustments</code></p>
+                <p style="color: #cbd5e1;">Recalcule sur <code>invoices</code> (kind = 'invoice') :</p>
                 <ul style="color: #cbd5e1; margin: 10px 0 0 20px;">
-                    <li><code>recovery_percent</code> = SUM(matched_amount) / amount_incl_vat * 100</li>
-                    <li><code>status</code> → unpaid / partial / paid</li>
+                    <li><code>settled_amount</code> = Σ matches + Σ allocations + Σ adjustments(decrease) - Σ adjustments(increase)</li>
+                    <li><code>open_amount</code> = amount_incl_vat - settled_amount</li>
+                    <li><code>recovery_percent</code> = settled_amount / amount_incl_vat * 100</li>
+                    <li><code>status</code> → unpaid (0) / partial (0 &lt; settled &lt; amount) / paid (settled ≥ amount)</li>
                 </ul>
+                <p style="color: #94a3b8; margin-top: 12px; font-size: 0.9em;">Pour <code>kind = 'credit_note'</code> : calcule <code>remaining_credit</code> = amount - Σ allocations - Σ matches(refund)</p>
+            </div>
+            <div class="card card-blue">
+                <h4>update_transaction_allocated() <span class="badge badge-new">v4.1</span></h4>
+                <p style="color: #94a3b8; margin: 10px 0;">Declencheur : INSERT / UPDATE / DELETE sur <code>matches</code></p>
+                <p style="color: #cbd5e1;">Recalcule sur <code>transactions</code> :</p>
+                <ul style="color: #cbd5e1; margin: 10px 0 0 20px;">
+                    <li><code>allocated_amount</code> = SUM(matches.matched_amount WHERE status='active')</li>
+                    <li><code>remaining_amount</code> = amount - allocated_amount</li>
+                    <li><code>status</code> → unmatched (0) / partial / matched (remaining = 0)</li>
+                </ul>
+                <p style="color: #94a3b8; margin-top: 12px; font-size: 0.9em;">Contrainte : SUM(matched_amount) ≤ transactions.amount</p>
             </div>
             <div class="card card-green">
-                <h4>update_counterparty_payment_analytics() <span class="badge badge-new">v4</span></h4>
-                <p style="color: #94a3b8; margin: 10px 0;">Declencheur : INSERT / UPDATE / DELETE sur <code>matches</code></p>
-                <p style="color: #cbd5e1;">Recalcule sur <code>counterparties</code> (si type = 'client' ou 'both') :</p>
+                <h4>update_counterparty_analytics() <span class="badge badge-new">v4</span></h4>
+                <p style="color: #94a3b8; margin: 10px 0;">Declencheur : INSERT / UPDATE / DELETE sur <code>matches</code>, <code>invoice_allocations</code></p>
+                <p style="color: #cbd5e1;">Recalcule sur <code>counterparties</code> :</p>
                 <ul style="color: #cbd5e1; margin: 10px 0 0 20px;">
                     <li><code>payment_score</code> = total_paid / total_invoiced * 100</li>
                     <li><code>avg_payment_days</code> = AVG(transaction_date - invoice_date)</li>
                     <li><code>total_invoiced</code>, <code>total_paid</code>, <code>invoice_count</code></li>
-                    <li><code>last_invoice_date</code>, <code>last_payment_date</code></li>
+                    <li><code>outstanding_credit</code> = Σ credit_notes.remaining_credit</li>
+                </ul>
+            </div>
+            <div class="card card-orange">
+                <h4>Contraintes d'integrite (triggers)</h4>
+                <p style="color: #94a3b8; margin: 10px 0;">Garde-fous pour eviter la sur-allocation :</p>
+                <ul style="color: #cbd5e1; margin: 10px 0 0 20px;">
+                    <li><strong>Plafond transaction :</strong> SUM(matches.matched_amount) ≤ transactions.amount</li>
+                    <li><strong>Plafond facture :</strong> settled_amount ≤ invoices.amount_incl_vat</li>
+                    <li><strong>Plafond avoir :</strong> SUM(allocations.applied_amount) ≤ credit_note.amount_incl_vat</li>
+                    <li><strong>Plafond payout :</strong> SUM(payout_bank_matches.matched_amount) ≤ psp_payout.amount</li>
                 </ul>
             </div>
         </div>
@@ -1055,36 +1313,63 @@ erDiagram
     <!-- RELATIONS                                     -->
     <!-- ============================================ -->
     <div class="section">
-        <h2>🔗 Resume des Relations (22 FK)</h2>
+        <h2>🔗 Resume des Relations (37 FK)</h2>
         <table>
             <thead><tr><th>#</th><th>De</th><th>Champ FK</th><th>Vers</th><th>Type</th><th>Cascade</th></tr></thead>
             <tbody>
+                <tr><td colspan="6" style="background: rgba(59,130,246,0.1); color: #60a5fa; font-weight: 600;">CORE — Organisation / Auth</td></tr>
                 <tr><td>1</td><td>tenants</td><td>organization_id</td><td>organizations</td><td>N:1</td><td>CASCADE</td></tr>
                 <tr><td>2</td><td>users</td><td>organization_id</td><td>organizations</td><td>N:1</td><td>CASCADE</td></tr>
                 <tr><td>3</td><td>tenant_members</td><td>tenant_id</td><td>tenants</td><td>N:1</td><td>CASCADE</td></tr>
                 <tr><td>4</td><td>tenant_members</td><td>user_id</td><td>users</td><td>N:1</td><td>CASCADE</td></tr>
+                <tr><td colspan="6" style="background: rgba(59,130,246,0.1); color: #60a5fa; font-weight: 600;">CORE — Donnees metier</td></tr>
                 <tr><td>5</td><td>counterparties</td><td>tenant_id</td><td>tenants</td><td>N:1</td><td>CASCADE</td></tr>
                 <tr><td>6</td><td>provider_connections</td><td>tenant_id</td><td>tenants</td><td>N:1</td><td>CASCADE</td></tr>
                 <tr><td>7</td><td>provider_connections</td><td>user_id</td><td>users</td><td>N:1</td><td>SET NULL</td></tr>
                 <tr><td>8</td><td>bank_accounts</td><td>connection_id</td><td>provider_connections</td><td>N:1</td><td>CASCADE</td></tr>
                 <tr><td>9</td><td>bank_accounts</td><td>tenant_id</td><td>tenants</td><td>N:1</td><td>CASCADE</td></tr>
+                <tr><td colspan="6" style="background: rgba(59,130,246,0.1); color: #60a5fa; font-weight: 600;">LEDGER BANQUE — Transactions</td></tr>
                 <tr><td>10</td><td>transactions</td><td>tenant_id</td><td>tenants</td><td>N:1</td><td>CASCADE</td></tr>
                 <tr><td>11</td><td>transactions</td><td>account_id</td><td>bank_accounts</td><td>N:1</td><td>SET NULL</td></tr>
                 <tr style="background: rgba(16,185,129,0.08);"><td>12</td><td>transactions</td><td>counterparty_id</td><td>counterparties</td><td>N:1</td><td>SET NULL</td></tr>
+                <tr><td colspan="6" style="background: rgba(59,130,246,0.1); color: #60a5fa; font-weight: 600;">LEDGER FACTURES — Invoices</td></tr>
                 <tr><td>13</td><td>invoices</td><td>tenant_id</td><td>tenants</td><td>N:1</td><td>CASCADE</td></tr>
                 <tr style="background: rgba(16,185,129,0.08);"><td>14</td><td>invoices</td><td>provider_connection_id</td><td>provider_connections</td><td>N:1</td><td>SET NULL</td></tr>
                 <tr style="background: rgba(16,185,129,0.08);"><td>15</td><td>invoices</td><td>counterparty_id</td><td>counterparties</td><td>N:1</td><td>SET NULL</td></tr>
-                <tr><td>16</td><td>matches</td><td>tenant_id</td><td>tenants</td><td>N:1</td><td>CASCADE</td></tr>
-                <tr><td>17</td><td>matches</td><td>transaction_id</td><td>transactions</td><td>N:1</td><td>CASCADE</td></tr>
-                <tr><td>18</td><td>matches</td><td>invoice_id</td><td>invoices</td><td>N:1</td><td>CASCADE</td></tr>
-                <tr><td>19</td><td>matches</td><td>crypto_transaction_id</td><td>crypto_transactions</td><td>N:1</td><td>CASCADE</td></tr>
-                <tr><td>20</td><td>matches</td><td>matched_by</td><td>users</td><td>N:1</td><td>SET NULL</td></tr>
-                <tr><td>21</td><td>crypto_transactions</td><td>tenant_id</td><td>tenants</td><td>N:1</td><td>CASCADE</td></tr>
-                <tr><td>22</td><td>import_jobs</td><td>tenant_id</td><td>tenants</td><td>N:1</td><td>CASCADE</td></tr>
+                <tr style="background: rgba(16,185,129,0.08);"><td>16</td><td>invoices</td><td>origin_invoice_id</td><td>invoices (self)</td><td>N:1</td><td>SET NULL</td></tr>
+                <tr><td colspan="6" style="background: rgba(59,130,246,0.1); color: #60a5fa; font-weight: 600;">MATCHING — Reconciliation</td></tr>
+                <tr><td>17</td><td>matches</td><td>tenant_id</td><td>tenants</td><td>N:1</td><td>CASCADE</td></tr>
+                <tr><td>18</td><td>matches</td><td>transaction_id</td><td>transactions</td><td>N:1</td><td>CASCADE</td></tr>
+                <tr><td>19</td><td>matches</td><td>invoice_id</td><td>invoices</td><td>N:1</td><td>CASCADE</td></tr>
+                <tr><td>20</td><td>matches</td><td>crypto_transaction_id</td><td>crypto_transactions</td><td>N:1</td><td>CASCADE</td></tr>
+                <tr style="background: rgba(16,185,129,0.08);"><td>21</td><td>matches</td><td>psp_event_id</td><td>psp_events</td><td>N:1</td><td>SET NULL</td></tr>
+                <tr><td>22</td><td>matches</td><td>matched_by</td><td>users</td><td>N:1</td><td>SET NULL</td></tr>
+                <tr><td colspan="6" style="background: rgba(16,185,129,0.1); color: #34d399; font-weight: 600;">NOUVEAU — Allocations / Adjustments / Relations</td></tr>
+                <tr style="background: rgba(16,185,129,0.08);"><td>23</td><td>invoice_allocations</td><td>tenant_id</td><td>tenants</td><td>N:1</td><td>CASCADE</td></tr>
+                <tr style="background: rgba(16,185,129,0.08);"><td>24</td><td>invoice_allocations</td><td>credit_invoice_id</td><td>invoices</td><td>N:1</td><td>CASCADE</td></tr>
+                <tr style="background: rgba(16,185,129,0.08);"><td>25</td><td>invoice_allocations</td><td>target_invoice_id</td><td>invoices</td><td>N:1</td><td>CASCADE</td></tr>
+                <tr style="background: rgba(16,185,129,0.08);"><td>26</td><td>invoice_allocations</td><td>created_by</td><td>users</td><td>N:1</td><td>SET NULL</td></tr>
+                <tr style="background: rgba(16,185,129,0.08);"><td>27</td><td>invoice_adjustments</td><td>tenant_id</td><td>tenants</td><td>N:1</td><td>CASCADE</td></tr>
+                <tr style="background: rgba(16,185,129,0.08);"><td>28</td><td>invoice_adjustments</td><td>invoice_id</td><td>invoices</td><td>N:1</td><td>CASCADE</td></tr>
+                <tr style="background: rgba(16,185,129,0.08);"><td>29</td><td>invoice_adjustments</td><td>created_by</td><td>users</td><td>N:1</td><td>SET NULL</td></tr>
+                <tr style="background: rgba(16,185,129,0.08);"><td>30</td><td>transaction_relations</td><td>tenant_id</td><td>tenants</td><td>N:1</td><td>CASCADE</td></tr>
+                <tr style="background: rgba(16,185,129,0.08);"><td>31</td><td>transaction_relations</td><td>from_transaction_id</td><td>transactions</td><td>N:1</td><td>CASCADE</td></tr>
+                <tr style="background: rgba(16,185,129,0.08);"><td>32</td><td>transaction_relations</td><td>to_transaction_id</td><td>transactions</td><td>N:1</td><td>CASCADE</td></tr>
+                <tr><td colspan="6" style="background: rgba(139,92,246,0.1); color: #a78bfa; font-weight: 600;">V2 — PSP Layer</td></tr>
+                <tr style="background: rgba(139,92,246,0.05);"><td>33</td><td>psp_events</td><td>tenant_id</td><td>tenants</td><td>N:1</td><td>CASCADE</td></tr>
+                <tr style="background: rgba(139,92,246,0.05);"><td>34</td><td>psp_events</td><td>provider_connection_id</td><td>provider_connections</td><td>N:1</td><td>SET NULL</td></tr>
+                <tr style="background: rgba(139,92,246,0.05);"><td>35</td><td>payout_bank_matches</td><td>tenant_id</td><td>tenants</td><td>N:1</td><td>CASCADE</td></tr>
+                <tr style="background: rgba(139,92,246,0.05);"><td>36</td><td>payout_bank_matches</td><td>psp_payout_event_id</td><td>psp_events</td><td>N:1</td><td>CASCADE</td></tr>
+                <tr style="background: rgba(139,92,246,0.05);"><td>37</td><td>payout_bank_matches</td><td>bank_transaction_id</td><td>transactions</td><td>N:1</td><td>CASCADE</td></tr>
+                <tr><td colspan="6" style="background: rgba(59,130,246,0.1); color: #60a5fa; font-weight: 600;">INFRA</td></tr>
+                <tr><td>38</td><td>crypto_transactions</td><td>tenant_id</td><td>tenants</td><td>N:1</td><td>CASCADE</td></tr>
+                <tr><td>39</td><td>import_jobs</td><td>tenant_id</td><td>tenants</td><td>N:1</td><td>CASCADE</td></tr>
+                <tr><td>40</td><td>import_jobs</td><td>user_id</td><td>users</td><td>N:1</td><td>SET NULL</td></tr>
             </tbody>
         </table>
         <p style="margin-top: 10px; color: #94a3b8; font-size: 0.9em;">
-            Les lignes vertes indiquent les nouvelles relations v4.
+            <span style="color: #34d399;">■</span> Vert = nouvelles relations v4/v4.1 &nbsp;&nbsp;
+            <span style="color: #a78bfa;">■</span> Violet = V2 (PSP layer)
         </p>
     </div>
 
@@ -1099,9 +1384,9 @@ erDiagram
                 <pre><code>Organization
   → Tenant
     → Counterparty (type: client | both)
-      → Invoice (invoice_type: 'issued')
-        → Match
-          → Transaction (amount > 0)
+      → Invoice (kind: 'invoice', invoice_type: 'issued')
+        → Match (matched_amount positif)
+          → Transaction (direction: 'in', flow_type: 'payment')
             → Bank Account
               → Provider Connection (category: banking)</code></pre>
             </div>
@@ -1110,9 +1395,9 @@ erDiagram
                 <pre><code>Organization
   → Tenant
     → Counterparty (type: supplier | both)
-      → Invoice (invoice_type: 'received')
-        → Match
-          → Transaction (amount < 0)
+      → Invoice (kind: 'invoice', invoice_type: 'received')
+        → Match (matched_amount positif)
+          → Transaction (direction: 'out', flow_type: 'payment')
             → Bank Account
               → Provider Connection (category: banking)</code></pre>
             </div>
@@ -1126,13 +1411,33 @@ erDiagram
             </div>
             <div class="card card-orange">
                 <h4>Flux 4 : Matching IA</h4>
-                <pre><code>Transaction (unmatched)
-  → Pre-filtre: montant ±10%, date ±30j
+                <pre><code>Transaction (status: unmatched)
+  → Pre-filtre: montant ±10%, date ±30j, direction
     → Lookup counterparty_name_normalized
       → Vertex AI: score de confiance
-        → Match (auto si ≥85%)
-          → Trigger: update_invoice_recovery()
+        → Match (auto si ≥85%, matched_amount positif)
+          → Trigger: update_invoice_settled()
+          → Trigger: update_transaction_allocated()
           → Trigger: update_counterparty_analytics()</code></pre>
+            </div>
+            <div class="card card-purple">
+                <h4>Flux 5 : Avoir → Compensation</h4>
+                <pre><code>Invoice (kind: 'credit_note')
+  → origin_invoice_id (si lie a une facture)
+  → invoice_allocations (credit_invoice_id)
+    → target_invoice_id → Invoice creditee
+      → Trigger: update_invoice_settled()
+  → OU Match → Transaction (flow_type: 'refund')
+    → Remboursement effectif</code></pre>
+            </div>
+            <div class="card card-red">
+                <h4>Flux 6 : Chargeback / Rejet</h4>
+                <pre><code>Transaction (flow_type: 'chargeback', direction: 'out')
+  → transaction_relations (from: paiement, to: chargeback)
+    → Cancel matches sur paiement original
+      → Re-reconcilier
+  → invoice_adjustments (si difference residuelle)
+    → Trigger: update_invoice_settled()</code></pre>
             </div>
         </div>
     </div>
@@ -1158,9 +1463,10 @@ erDiagram
 
     <!-- FOOTER -->
     <div style="text-align: center; padding: 40px 20px; color: #475569; font-size: 0.9em;">
-        <p style="margin-bottom: 5px;"><strong>Invunion</strong> - Architecture v4 Schema</p>
-        <p>13 tables &bull; 22 relations &bull; 2 triggers &bull; Optimise matching IA + comptabilite</p>
-        <p style="margin-top: 10px;">Document cree: 13 fevrier 2026</p>
+        <p style="margin-bottom: 5px;"><strong>Invunion</strong> - Architecture v4.1 Schema</p>
+        <p>18 tables &bull; 40 relations &bull; 4 triggers &bull; 3 ledgers (Banque / Facture / PSP)</p>
+        <p style="margin-top: 5px;">Reconciliation avancee : avoirs, netting, adjustments, chargebacks, PSP-ready</p>
+        <p style="margin-top: 10px;">Document mis a jour: 13 fevrier 2026</p>
     </div>
 
 </div>
