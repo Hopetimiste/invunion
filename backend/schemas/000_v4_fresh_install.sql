@@ -171,6 +171,39 @@ CREATE INDEX idx_transactions_structured_ref ON transactions(structured_referenc
 CREATE INDEX idx_transactions_direction ON transactions(direction);
 
 -- ============================================================
+-- 4B. CRYPTO TRANSACTIONS
+-- ============================================================
+
+CREATE TABLE crypto_transactions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    wallet_address VARCHAR(255),
+    chain VARCHAR(50),
+    provider VARCHAR(50),
+    tx_hash VARCHAR(255) UNIQUE,
+    amount DECIMAL(30, 18) NOT NULL,
+    token_symbol VARCHAR(20),
+    token_address VARCHAR(255),
+    from_address VARCHAR(255),
+    to_address VARCHAR(255),
+    transaction_date TIMESTAMPTZ NOT NULL,
+    gas_used DECIMAL(20, 8),
+    gas_price DECIMAL(30, 18),
+    status VARCHAR(20) CHECK (status IN ('pending', 'confirmed', 'failed', 'dropped')),
+    raw_data JSONB,
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_crypto_transactions_tenant ON crypto_transactions(tenant_id);
+CREATE INDEX idx_crypto_transactions_tx_hash ON crypto_transactions(tx_hash);
+CREATE INDEX idx_crypto_transactions_wallet ON crypto_transactions(wallet_address);
+CREATE INDEX idx_crypto_transactions_chain ON crypto_transactions(chain);
+CREATE INDEX idx_crypto_transactions_date ON crypto_transactions(transaction_date);
+CREATE INDEX idx_crypto_transactions_status ON crypto_transactions(status);
+
+-- ============================================================
 -- 5. INVOICES
 -- ============================================================
 
@@ -225,6 +258,7 @@ CREATE TABLE matches (
     tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     transaction_id UUID REFERENCES transactions(id) ON DELETE CASCADE,
     invoice_id UUID REFERENCES invoices(id) ON DELETE CASCADE,
+    crypto_transaction_id UUID REFERENCES crypto_transactions(id) ON DELETE CASCADE,
     psp_event_id UUID,
     invoice_line_id UUID,
     amount DECIMAL(15, 2) NOT NULL,
@@ -239,6 +273,7 @@ CREATE TABLE matches (
 CREATE INDEX idx_matches_tenant ON matches(tenant_id);
 CREATE INDEX idx_matches_transaction ON matches(transaction_id);
 CREATE INDEX idx_matches_invoice ON matches(invoice_id);
+CREATE INDEX idx_matches_crypto_transaction ON matches(crypto_transaction_id);
 CREATE INDEX idx_matches_psp_event ON matches(psp_event_id);
 
 -- ============================================================
@@ -425,6 +460,7 @@ CREATE TRIGGER update_counterparties_updated_at BEFORE UPDATE ON counterparties 
 CREATE TRIGGER update_provider_connections_updated_at BEFORE UPDATE ON provider_connections FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_transactions_updated_at BEFORE UPDATE ON transactions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_invoices_updated_at BEFORE UPDATE ON invoices FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_crypto_transactions_updated_at BEFORE UPDATE ON crypto_transactions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Auto-calculate invoice open_amount
 CREATE OR REPLACE FUNCTION update_invoice_settled()

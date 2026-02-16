@@ -20,7 +20,7 @@ bash backend/schemas/deploy-invunion-prod.sh
 3. Applies v4.1 schema (18 tables)
 4. Verifies installation
 
-## Expected Tables (18 total)
+## Expected Tables (19 total)
 
 ### Core Hierarchy
 - `organizations` - Multi-org support
@@ -32,8 +32,9 @@ bash backend/schemas/deploy-invunion-prod.sh
 - `counterparties` - Unified clients/suppliers
 - `provider_connections` - Banking + invoicing providers
 - `transactions` - Bank movements
+- `crypto_transactions` - Crypto/blockchain transactions
 - `invoices` - Invoices & credit notes
-- `matches` - Transaction-invoice links
+- `matches` - Transaction-invoice links (bank + crypto)
 
 ### Advanced Reconciliation
 - `invoice_allocations` - Partial payments
