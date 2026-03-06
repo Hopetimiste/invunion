@@ -62,14 +62,13 @@ jobs:
             --allow-unauthenticated \
             --set-cloudsql-instances ${{ secrets.CLOUD_SQL_CONNECTION_NAME }} \
             --set-env-vars "NODE_ENV=production,GCP_PROJECT_ID=${{ env.PROJECT_ID }},DB_USER=${{ secrets.DB_USER }},DB_NAME=${{ secrets.DB_NAME }},CLOUD_SQL_CONNECTION_NAME=${{ secrets.CLOUD_SQL_CONNECTION_NAME }},PUBSUB_TOPIC_INGEST=ingest,PUBSUB_TOPIC_MATCHING=matching,PUBSUB_TOPIC_ALERTS=alerts" \
-            --set-secrets "DB_PASSWORD=${{ secrets.DB_PASSWORD_SECRET }}:latest,PUBSUB_PUSH_SECRET=${{ secrets.PUBSUB_PUSH_SECRET }}:latest" \
+            --set-secrets "DB_PASSWORD=${{ secrets.DB_PASSWORD_SECRET }}:latest" \
             --min-instances 0 \
             --max-instances 5 \
             --memory 512Mi \
             --cpu 1 \
             --timeout 600 \
-            --concurrency 10 \
-            --ingress internal-and-cloud-load-balancing
+            --concurrency 10
 
       - name: Get Worker URL
         id: get_url
