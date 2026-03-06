@@ -13,7 +13,7 @@ export function getPool(): pg.Pool {
   if (!pool) {
     const isProduction = config.nodeEnv === 'production';
     
-    pool = new Pool({
+    const poolConfig = {
       // En production, utiliser Unix socket pour Cloud SQL
       ...(isProduction && config.database.connectionName
         ? { host: `/cloudsql/${config.database.connectionName}` }
@@ -31,14 +31,23 @@ export function getPool(): pg.Pool {
       max: 10, // Maximum connections in pool
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 10000,
-    });
+    };
+    
+    console.log(`[Database] Initializing pool: host=${poolConfig.host}, database=${poolConfig.database}, user=${poolConfig.user}`);
+    
+    pool = new Pool(poolConfig);
 
     pool.on('error', (err) => {
       console.error('[Database] Unexpected error on idle client', err);
     });
 
-    pool.on('connect', () => {
+    pool.on('connect', (client) => {
       console.log('[Database] New client connected');
+      client.query("SELECT current_database() as db, current_user as usr, (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public') as tables").then((r: any) => {
+        console.log(`[Database] Connected to: db=${r.rows[0].db}, user=${r.rows[0].usr}, tables=${r.rows[0].tables}`);
+      }).catch((e: any) => {
+        console.error(`[Database] Diagnostic query failed: ${e.message}`);
+      });
     });
   }
   

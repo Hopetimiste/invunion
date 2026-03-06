@@ -3,7 +3,7 @@ import admin from 'firebase-admin';
 // Initialize Firebase Admin
 if (!admin.apps.length) {
   admin.initializeApp({
-    projectId: 'br-project-481607',
+    projectId: 'invunion-prod',
   });
 }
 

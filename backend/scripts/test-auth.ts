@@ -11,7 +11,7 @@
 
 import admin from 'firebase-admin';
 
-const PROJECT_ID = 'br-project-481607';
+const PROJECT_ID = 'invunion-prod';
 const API_URL = 'http://localhost:8080';
 
 // Initialize Firebase Admin

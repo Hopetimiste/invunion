@@ -30,11 +30,11 @@ export const config = {
   nodeEnv: process.env.NODE_ENV || 'development',
   
   // GCP
-  projectId: process.env.GCP_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT || 'br-project-481607',
+  projectId: process.env.GCP_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT || 'invunion-prod',
   
   // Firebase
   firebase: {
-    projectId: process.env.FIREBASE_PROJECT_ID || 'br-project-481607',
+    projectId: process.env.FIREBASE_PROJECT_ID || 'invunion-prod',
   },
   
   // Cloud SQL PostgreSQL

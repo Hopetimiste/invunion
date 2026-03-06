@@ -1,6 +1,6 @@
-# 🔄 N8N Workflows - Union Banking Integration
+# 🔄 N8N Workflows - Invunion Banking Integration
 
-Ce dossier contient les workflows n8n pour intégrer les services bancaires Open Banking (Tink, GoCardless) avec le backend Union.
+Ce dossier contient les workflows n8n pour intégrer les services bancaires Open Banking (Tink, GoCardless) avec le backend Invunion.
 
 ## 📁 Fichiers
 
@@ -36,8 +36,8 @@ Dans n8n Cloud → **Settings** → **Environment Variables** :
 ```bash
 TINK_CLIENT_ID=your_client_id
 TINK_CLIENT_SECRET=your_client_secret
-BACKEND_URL=https://union-api-xxx.run.app
-FRONTEND_URL=https://your-app.lovableproject.com
+BACKEND_URL=https://api.invunion.com
+FRONTEND_URL=https://app.invunion.com
 ```
 
 #### Credentials
