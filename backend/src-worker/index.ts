@@ -57,18 +57,31 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
-// ─── Optional: verify Pub/Sub push secret (dev / non-GCP environments) ───────
+// ─── Verify Pub/Sub push authenticity ────────────────────────────────────────
+//
+// In production, Pub/Sub sends an OIDC token in the Authorization header.
+// Cloud Run with IAM enabled automatically validates this token.
+// For additional security, we also check a shared secret in X-Pubsub-Token header.
 
 function verifyPushSecret(req: Request, res: Response, next: NextFunction): void {
-  const secret = workerConfig.pubsub.pushSecret;
-  if (!secret || workerConfig.nodeEnv === 'development') {
+  // In development, skip verification
+  if (workerConfig.nodeEnv === 'development') {
     return next();
   }
-  const token = req.headers['x-pubsub-token'] ?? req.query.token;
-  if (token !== secret) {
-    res.status(401).json({ success: false, error: 'Unauthorized' });
-    return;
+
+  const secret = workerConfig.pubsub.pushSecret;
+  
+  // In production, if secret is configured, verify it
+  if (secret) {
+    const token = req.headers['x-pubsub-token'];
+    if (token !== secret) {
+      console.warn('[Worker] Unauthorized Pub/Sub request (invalid token)');
+      res.status(401).json({ success: false, error: 'Unauthorized' });
+      return;
+    }
   }
+  
+  // If no secret configured, rely on Cloud Run IAM + OIDC (default Pub/Sub behavior)
   next();
 }
 

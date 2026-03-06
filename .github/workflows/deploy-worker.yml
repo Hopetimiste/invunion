@@ -59,10 +59,10 @@ jobs:
             --image ${{ env.IMAGE }}:${{ github.sha }} \
             --platform managed \
             --region ${{ env.REGION }} \
-            --no-allow-unauthenticated \
+            --allow-unauthenticated \
             --set-cloudsql-instances ${{ secrets.CLOUD_SQL_CONNECTION_NAME }} \
             --set-env-vars "NODE_ENV=production,GCP_PROJECT_ID=${{ env.PROJECT_ID }},DB_USER=${{ secrets.DB_USER }},DB_NAME=${{ secrets.DB_NAME }},CLOUD_SQL_CONNECTION_NAME=${{ secrets.CLOUD_SQL_CONNECTION_NAME }},PUBSUB_TOPIC_INGEST=ingest,PUBSUB_TOPIC_MATCHING=matching,PUBSUB_TOPIC_ALERTS=alerts" \
-            --set-secrets "DB_PASSWORD=${{ secrets.DB_PASSWORD_SECRET }}:latest" \
+            --set-secrets "DB_PASSWORD=${{ secrets.DB_PASSWORD_SECRET }}:latest,PUBSUB_PUSH_SECRET=${{ secrets.PUBSUB_PUSH_SECRET }}:latest" \
             --min-instances 0 \
             --max-instances 5 \
             --memory 512Mi \
@@ -84,13 +84,13 @@ jobs:
       - name: Verify deployment (health check)
         run: |
           WORKER_URL=${{ steps.get_url.outputs.worker_url }}
-          TOKEN=$(gcloud auth print-identity-token)
-          echo "Testing worker health endpoint with auth token..."
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $TOKEN" "$WORKER_URL/health")
-          if [ "$HTTP_CODE" -eq 200 ] || [ "$HTTP_CODE" -eq 503 ]; then
-            echo "Worker health check returned $HTTP_CODE (acceptable)"
+          echo "Testing worker health endpoint (public access)..."
+          RESPONSE=$(curl -s "$WORKER_URL/health")
+          echo "$RESPONSE"
+          if echo "$RESPONSE" | grep -q '"service":"invunion-worker"'; then
+            echo "✓ Worker health check passed"
           else
-            echo "Worker health check failed with HTTP $HTTP_CODE"
+            echo "✗ Worker health check failed"
             exit 1
           fi
 

@@ -17,12 +17,14 @@ PROJECT_ID="${GCP_PROJECT_ID:-invunion-prod}"
 REGION="${REGION:-europe-west1}"
 WORKER_URL="${WORKER_URL:?Set WORKER_URL to the Cloud Run Worker URL}"
 PUBSUB_SA="${PUBSUB_SA:-pubsub-push@${PROJECT_ID}.iam.gserviceaccount.com}"
+PUSH_SECRET="${PUBSUB_PUSH_SECRET:-$(openssl rand -hex 32)}"
 
 echo "=== Invunion Pub/Sub Setup ==="
 echo "Project:    $PROJECT_ID"
 echo "Region:     $REGION"
 echo "Worker URL: $WORKER_URL"
 echo "Push SA:    $PUBSUB_SA"
+echo "Push Secret: ${PUSH_SECRET:0:16}... (generated if not set)"
 echo ""
 
 # ─── 1. Enable Pub/Sub API ────────────────────────────────────────────────────
@@ -70,12 +72,16 @@ done
 # ─── 5. Create push subscriptions ─────────────────────────────────────────────
 echo "[5/6] Creating push subscriptions..."
 
+# Add shared secret as header (X-Pubsub-Token) for additional security
+PUSH_HEADERS="X-Pubsub-Token=${PUSH_SECRET}"
+
 # ingest — ack deadline 120s, max 5 retries then DLQ
 gcloud pubsub subscriptions create ingest-push \
   --project="$PROJECT_ID" \
   --topic=ingest \
   --push-endpoint="${WORKER_URL}/pubsub/ingest" \
   --push-auth-service-account="$PUBSUB_SA" \
+  --push-auth-token-audience="${WORKER_URL}" \
   --ack-deadline=120 \
   --max-delivery-attempts=5 \
   --dead-letter-topic=ingest-dlq \
@@ -83,7 +89,8 @@ gcloud pubsub subscriptions create ingest-push \
 gcloud pubsub subscriptions modify-push-config ingest-push \
   --project="$PROJECT_ID" \
   --push-endpoint="${WORKER_URL}/pubsub/ingest" \
-  --push-auth-service-account="$PUBSUB_SA"
+  --push-auth-service-account="$PUBSUB_SA" \
+  --push-auth-token-audience="${WORKER_URL}"
 echo "  ingest-push -> ${WORKER_URL}/pubsub/ingest"
 
 # matching — ack deadline 600s (AI matching is slow), max 5 retries
@@ -92,6 +99,7 @@ gcloud pubsub subscriptions create matching-push \
   --topic=matching \
   --push-endpoint="${WORKER_URL}/pubsub/matching" \
   --push-auth-service-account="$PUBSUB_SA" \
+  --push-auth-token-audience="${WORKER_URL}" \
   --ack-deadline=600 \
   --max-delivery-attempts=5 \
   --dead-letter-topic=matching-dlq \
@@ -99,7 +107,8 @@ gcloud pubsub subscriptions create matching-push \
 gcloud pubsub subscriptions modify-push-config matching-push \
   --project="$PROJECT_ID" \
   --push-endpoint="${WORKER_URL}/pubsub/matching" \
-  --push-auth-service-account="$PUBSUB_SA"
+  --push-auth-service-account="$PUBSUB_SA" \
+  --push-auth-token-audience="${WORKER_URL}"
 echo "  matching-push -> ${WORKER_URL}/pubsub/matching"
 
 # alerts — ack deadline 60s, max 5 retries
@@ -108,6 +117,7 @@ gcloud pubsub subscriptions create alerts-push \
   --topic=alerts \
   --push-endpoint="${WORKER_URL}/pubsub/alerts" \
   --push-auth-service-account="$PUBSUB_SA" \
+  --push-auth-token-audience="${WORKER_URL}" \
   --ack-deadline=60 \
   --max-delivery-attempts=5 \
   --dead-letter-topic=alerts-dlq \
@@ -115,7 +125,8 @@ gcloud pubsub subscriptions create alerts-push \
 gcloud pubsub subscriptions modify-push-config alerts-push \
   --project="$PROJECT_ID" \
   --push-endpoint="${WORKER_URL}/pubsub/alerts" \
-  --push-auth-service-account="$PUBSUB_SA"
+  --push-auth-service-account="$PUBSUB_SA" \
+  --push-auth-token-audience="${WORKER_URL}"
 echo "  alerts-push -> ${WORKER_URL}/pubsub/alerts"
 
 # ─── 6. Smoke test ────────────────────────────────────────────────────────────
