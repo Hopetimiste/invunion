@@ -6,6 +6,9 @@ on:
       - main
     paths:
       - 'backend/**'
+      - '!backend/src-worker/**'
+      - '!backend/Dockerfile.worker'
+      - '!backend/tsconfig.worker.json'
       - '.github/workflows/backend-deploy.yml'
 
 env:
