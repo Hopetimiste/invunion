@@ -1,0 +1,101 @@
+name: Deploy Worker (Cloud Run)
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/src-worker/**'
+      - 'backend/tsconfig.worker.json'
+      - 'backend/Dockerfile.worker'
+      - '.github/workflows/deploy-worker.yml'
+
+env:
+  PROJECT_ID: invunion-prod
+  SERVICE_NAME: invunion-worker
+  REGION: europe-west1
+  IMAGE: europe-west1-docker.pkg.dev/invunion-prod/invunion-registry/invunion-worker
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker europe-west1-docker.pkg.dev
+
+      - name: Build Docker image
+        run: |
+          cd backend
+          docker build -f Dockerfile.worker \
+            -t ${{ env.IMAGE }}:${{ github.sha }} \
+            -t ${{ env.IMAGE }}:latest \
+            .
+
+      - name: Push Docker image
+        run: |
+          docker push ${{ env.IMAGE }}:${{ github.sha }}
+          docker push ${{ env.IMAGE }}:latest
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ${{ env.SERVICE_NAME }} \
+            --image ${{ env.IMAGE }}:${{ github.sha }} \
+            --platform managed \
+            --region ${{ env.REGION }} \
+            --no-allow-unauthenticated \
+            --set-cloudsql-instances ${{ secrets.CLOUD_SQL_CONNECTION_NAME }} \
+            --set-env-vars "NODE_ENV=production,GCP_PROJECT_ID=${{ env.PROJECT_ID }},DB_USER=${{ secrets.DB_USER }},DB_NAME=${{ secrets.DB_NAME }},CLOUD_SQL_CONNECTION_NAME=${{ secrets.CLOUD_SQL_CONNECTION_NAME }},PUBSUB_TOPIC_INGEST=ingest,PUBSUB_TOPIC_MATCHING=matching,PUBSUB_TOPIC_ALERTS=alerts" \
+            --set-secrets "DB_PASSWORD=${{ secrets.DB_PASSWORD_SECRET }}:latest" \
+            --min-instances 0 \
+            --max-instances 5 \
+            --memory 512Mi \
+            --cpu 1 \
+            --timeout 600 \
+            --concurrency 10
+
+      - name: Get Worker URL
+        id: get_url
+        run: |
+          WORKER_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
+            --platform managed \
+            --region ${{ env.REGION }} \
+            --format 'value(status.url)')
+          echo "worker_url=$WORKER_URL" >> $GITHUB_OUTPUT
+          echo "Worker deployed at: $WORKER_URL"
+
+      - name: Verify deployment (health check)
+        run: |
+          # Worker is not publicly accessible, so we test via gcloud
+          # The /health endpoint must return 200 even without auth (Cloud Run allows GET / on health)
+          WORKER_URL=${{ steps.get_url.outputs.worker_url }}
+          TOKEN=$(gcloud auth print-identity-token)
+          curl -f -H "Authorization: Bearer $TOKEN" "$WORKER_URL/health" || exit 1
+
+      - name: Output Pub/Sub subscription URLs
+        run: |
+          WORKER_URL=${{ steps.get_url.outputs.worker_url }}
+          echo "============================================================"
+          echo "Worker deployed. Configure Pub/Sub push subscriptions to:"
+          echo "  Ingest:   $WORKER_URL/pubsub/ingest"
+          echo "  Matching: $WORKER_URL/pubsub/matching"
+          echo "  Alerts:   $WORKER_URL/pubsub/alerts"
+          echo ""
+          echo "Run setup-pubsub.sh to create/update subscriptions."
+          echo "============================================================"
